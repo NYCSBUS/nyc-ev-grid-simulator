@@ -65,7 +65,7 @@ export default function App() {
         </nav>
         <span className="spacer" />
         <SearchBox />
-        <Tip text="Replay the guided tour">
+        <Tip text="Guided walkthrough: the app answers five real analyst questions step by step">
           <button className="btn small" onClick={() => requestTour(true)}>
             Tour
           </button>

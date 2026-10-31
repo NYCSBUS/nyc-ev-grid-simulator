@@ -110,7 +110,7 @@ function SiteEditor({ site }: { site: Site }) {
         <input type="text" className="wide" value={site.name} onChange={(e) => set({ name: e.target.value })} placeholder="Site name" />
       </div>
 
-      <h3>
+      <h3 id="tour-chargers">
         Chargers <Help text="Port counts by charger type. Nameplate kW = Σ ports × kW. DC fast ports usually need a 460/480 V service, so the simulator prefers a 460 V transformer when one is within the radius." />
       </h3>
       <div className="charger-grid">
@@ -132,7 +132,7 @@ function SiteEditor({ site }: { site: Site }) {
         <b>{fmt.kw(nameplateKw(site))}</b>
       </div>
 
-      <h3>Load shape</h3>
+      <h3 id="tour-loadshape">Load shape</h3>
       <Select
         label="Use profile"
         value={site.profile}
@@ -191,7 +191,7 @@ function SiteEditor({ site }: { site: Site }) {
         help="In Con Edison's secondary networks several transformers feed a meshed low-voltage grid, so new load is shared. Radial / outer-borough services typically hang off a single transformer."
       />
 
-      <h3>
+      <h3 id="tour-impact">
         Impact at system peak{' '}
         <Help text="Traffic lights compare the load this site adds at the system peak hour to the headroom published on Con Edison's hosting-capacity maps. Transformer ranges are converted to kVA using the settings." />
       </h3>

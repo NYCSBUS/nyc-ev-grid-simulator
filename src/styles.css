@@ -896,6 +896,22 @@ table.data tr:hover td {
 .driver-popover-progress-text {
   color: var(--muted) !important;
 }
+.tour-popover {
+  max-width: 420px !important;
+  width: 420px !important;
+}
+.tour-popover .driver-popover-description {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.tour-dyn {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  background: var(--panel-2);
+  border-radius: 0 6px 6px 0;
+  font-size: 12.5px;
+}
 
 .empty {
   color: var(--muted);

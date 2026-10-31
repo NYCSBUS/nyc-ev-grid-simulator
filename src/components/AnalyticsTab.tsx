@@ -268,7 +268,7 @@ export function AnalyticsTab() {
         </div>
       </div>
 
-      <div className="kpis">
+      <div className="kpis" id="tour-kpis">
         <Kpi label="Sites / ports" value={`${scenario.sites.length} / ${sum.ports}`} b={sumB ? `${compare!.sites.length} / ${sumB.ports}` : undefined} />
         <Kpi label="Nameplate" value={fmt.kw(sum.nameplate)} help="Sum of port kW across all sites." b={sumB ? fmt.kw(sumB.nameplate) : undefined} />
         <Kpi label="Coincident peak" value={fmt.kw(sum.coincident)} sub={`at ${peakHour}:00 · site peak ${fmt.kw(sum.peak)}`} help="Total load at the system peak hour after profiles, diversity, managed charging and storage." b={sumB ? fmt.kw(sumB.coincident) : undefined} />
@@ -281,7 +281,7 @@ export function AnalyticsTab() {
       </div>
 
       <div className="grid-2">
-        <div className="card">
+        <div className="card" id="tour-hourly">
           <h3>
             <span>
               Hourly load profile <Help text="Stacked by site. Dashed red = the same sites with no managed charging or storage. Blue line = system peak hour used for status." />
@@ -292,7 +292,7 @@ export function AnalyticsTab() {
           </h3>
           <Chart option={loadOpt} height={300} onReady={(c) => (charts.current.load = c)} />
         </div>
-        <div className="card">
+        <div className="card" id="tour-assetchart">
           <h3>
             <span>
               Asset loading at system peak <Help text="Added site load as a percentage of each asset's published headroom. Capped at 150% for display." />
@@ -305,7 +305,7 @@ export function AnalyticsTab() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card" id="tour-sitetable">
         <h3>
           <span>Site detail</span>
         </h3>
@@ -377,7 +377,7 @@ export function AnalyticsTab() {
       </div>
 
       <div className="grid-2">
-        <div className="card">
+        <div className="card" id="tour-cost">
           <h3>
             <span>
               Cost breakdown by site <Help text="Illustrative: port hardware + make-ready $/kW + storage + grid upgrades triggered by critical assets. Edit assumptions in Settings." />
@@ -404,7 +404,7 @@ export function AnalyticsTab() {
       {area ? (
         <>
           <div className="grid-2">
-            <div className="card">
+            <div className="card" id="tour-networkchart">
               <h3>
                 <span>
                   Top networks by added EV load ({area.year}) <Help text="Coloured by status against the network's published hosting-capacity range (midpoint of 0–25 / 25–50 / 50–100 / >100 MW). Grey bars show that midpoint." />
@@ -425,7 +425,7 @@ export function AnalyticsTab() {
               <Chart option={boroughOpt} height={420} onReady={(c) => (charts.current.boro = c)} />
             </div>
           </div>
-          <div className="card">
+          <div className="card" id="tour-networktable">
             <h3>
               <span>Network stress table</span>
               <span className="row">

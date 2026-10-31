@@ -233,7 +233,7 @@ export function HelpTab() {
             requestTour(true);
           }}
         >
-          ▶ Replay guided tour
+          ▶ Replay the analyst walkthrough
         </button>
       </nav>
       <article>
