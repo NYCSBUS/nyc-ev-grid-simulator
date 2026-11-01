@@ -12,6 +12,7 @@ import { STATUS_COLOR, fmt } from './ui';
 import type { AcsVariable, FC, Site } from '../types';
 import type { Status } from '../types';
 import { Legend } from './Legend';
+import { verdictFor } from '../sim/verdict';
 import { LayersPanel } from './LayersPanel';
 import { FiltersPanel } from './FiltersPanel';
 import type { LayerVisibility } from '../types';
@@ -349,8 +350,16 @@ export function MapView() {
         id: 'impact-line',
         type: 'line',
         source: 'impact',
-        filter: ['==', ['geometry-type'], 'LineString'],
+        filter: ['all', ['==', ['geometry-type'], 'LineString'], ['!=', ['get', 'kind'], 'flow']],
         paint: { 'line-color': ['get', 'color'], 'line-width': 6, 'line-opacity': 0.55, 'line-blur': 1 },
+      });
+      // thin dashed "where the load goes" lines from the site to each piece of equipment it draws from
+      map.addLayer({
+        id: 'impact-flow',
+        type: 'line',
+        source: 'impact',
+        filter: ['==', ['get', 'kind'], 'flow'],
+        paint: { 'line-color': ['get', 'color'], 'line-width': 2, 'line-dasharray': [1.5, 1.5], 'line-opacity': 0.9 },
       });
       map.addLayer({
         id: 'impact-fill',
@@ -365,6 +374,22 @@ export function MapView() {
         source: 'impact',
         filter: ['==', ['geometry-type'], 'Point'],
         paint: { 'circle-radius': 13, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': ['get', 'color'], 'circle-stroke-width': 3 },
+      });
+      // "% of room used" tag on each impacted piece of equipment
+      map.addLayer({
+        id: 'impact-label',
+        type: 'symbol',
+        source: 'impact',
+        filter: ['all', ['==', ['geometry-type'], 'Point'], ['has', 'label']],
+        layout: {
+          'text-field': ['get', 'label'],
+          'text-size': 11,
+          'text-offset': [0, -1.7],
+          'text-anchor': 'bottom',
+          'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+          'text-allow-overlap': true,
+        },
+        paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#0f1419', 'text-halo-width': 1.6 },
       });
 
       // sites
@@ -605,7 +630,7 @@ export function MapView() {
           geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
           properties: {
             id: s.id,
-            label: `${s.name} · ${fmt.kw(nameplateKw(s))}`,
+            label: `${s.name} · ${a ? fmt.kw(a.coincidentKw) + ' at 5 PM' : fmt.kw(nameplateKw(s))}${a ? ' · ' + (a.worst === 'crit' ? "doesn't fit" : a.worst === 'warn' ? 'tight' : a.worst === 'ok' ? 'fits' : '') : ''}`,
             color: STATUS_COLOR[status],
             selected: s.id === selectedSiteId,
           },
@@ -632,7 +657,10 @@ export function MapView() {
       if (!a) continue;
       for (const asset of a.assets) {
         if (asset.status === 'unknown' || asset.kind === 'network') continue;
-        feats.push({ type: 'Feature', geometry: asset.geometry, properties: { color: STATUS_COLOR[asset.status], kind: asset.kind } });
+        const pct = asset.ratio != null ? `${Math.round(Math.min(asset.ratio, 9.99) * 100)}%` : undefined;
+        feats.push({ type: 'Feature', geometry: asset.geometry, properties: { color: STATUS_COLOR[asset.status], kind: asset.kind, label: pct } });
+        if (asset.geometry.type === 'Point' && asset.ratio != null)
+          feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [[s.lng, s.lat], asset.geometry.coordinates] }, properties: { color: STATUS_COLOR[asset.status], kind: 'flow' } });
       }
     }
     return { type: 'FeatureCollection', features: feats };
@@ -658,7 +686,7 @@ export function MapView() {
     vis(['buildings-fill'], layers.buildings);
     vis(['feeders33kv-line'], layers.feeders33kv);
     vis(['sites-circle', 'sites-label', 'sites-icon'], layers.sites);
-    vis(['site-radius-fill', 'site-radius-line', 'impact-line', 'impact-point', 'impact-fill'], layers.sites && mode === 'sites');
+    vis(['site-radius-fill', 'site-radius-line', 'impact-line', 'impact-point', 'impact-fill', 'impact-flow', 'impact-label'], layers.sites && mode === 'sites');
 
     // transformer filter
     const xf: any[] = ['all'];
@@ -782,6 +810,7 @@ export function MapView() {
 
   const zoom = viewport.zoom;
   const loadingAny = Object.values(live.loading).some(Boolean);
+  const selectedSite = sites.find((s) => s.id === selectedSiteId);
   const hints: string[] = [];
   if (mode === 'sites') {
     const wantsEquipment = layers.transformers || layers.feeders || layers.buildings || layers.structures;
@@ -816,6 +845,7 @@ export function MapView() {
         ))}
       </div>
       {placing && <div className="map-overlay placing-banner">Click anywhere on the map to put chargers there · Esc to cancel</div>}
+      {!placing && mode === 'sites' && selectedSite && <VerdictBanner site={selectedSite} a={assessments.get(selectedSite.id)} loading={loadingAny} />}
       <Legend thresholds={thresholds} areaActive={!!area && layers.areaStress} layers={layers} zoom={zoom} />
       <div className="map-overlay map-tools">
         <button className={`btn small ${drawer === 'layers' ? 'active' : ''}`} onClick={() => setDrawer(drawer === 'layers' ? null : 'layers')} id="tour-layers-btn">
@@ -839,6 +869,28 @@ export function MapView() {
           {drawer === 'layers' ? <LayersPanel mode={mode} /> : <FiltersPanel mode={mode} />}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Floating answer over the map for the selected site; re-mounts (and pulses) whenever the verdict changes. */
+function VerdictBanner({ site, a, loading }: { site: Site; a?: import('../types').SiteAssessment; loading: boolean }) {
+  const v = verdictFor(a, loading);
+  const key = `${site.id}-${v.level}-${Math.round(a?.coincidentKw ?? 0)}-${v.counts.crit}-${v.counts.warn}`;
+  return (
+    <div key={key} className={`map-overlay verdict-banner ${v.status}`} id="tour-map-verdict" onClick={() => document.getElementById('tour-verdict')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+      <span className={`status ${v.status}`} />
+      <div>
+        <div className="vb-title">
+          {site.name}: <b>{v.title}</b>
+          {a && (
+            <span className="verdict-counts">
+              <span style={{ color: 'var(--ok)' }}>{v.counts.ok} green</span> · <span style={{ color: 'var(--warn)' }}>{v.counts.warn} amber</span> · <span style={{ color: 'var(--crit)' }}>{v.counts.crit} red</span>
+            </span>
+          )}
+        </div>
+        <div className="vb-sub">{v.summary}</div>
+      </div>
     </div>
   );
 }

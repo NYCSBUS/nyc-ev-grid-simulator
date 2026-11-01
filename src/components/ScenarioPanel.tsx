@@ -3,9 +3,10 @@ import { useStore } from '../state/store';
 import { useAssessments, useAreaResult } from '../state/hooks';
 import { CHARGERS, CURVE_LABELS, PROFILES, evShare } from '../sim/profiles';
 import { nameplateKw, portCount } from '../sim/model';
-import type { ChargerType, Site } from '../types';
+import type { ChargerType, Site, SiteAssessment } from '../types';
 import { Check, Chips, Help, Select, Slider, StatusDot, StatusPill, Tip, fmt } from './ui';
 import { kwPerEv } from '../sim/area';
+import { VERDICT_WORD, verdictFor } from '../sim/verdict';
 
 const BOROUGHS = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island', 'Westchester'];
 
@@ -42,6 +43,7 @@ export function ScenarioPanel() {
             <div className="title">
               <span className="row" style={{ gap: 6 }}>
                 <StatusDot status={a?.worst ?? 'unknown'} /> {s.name}
+                <span className={`pill ${a?.worst ?? 'unknown'}`}>{VERDICT_WORD[verdictFor(a).level]}</span>
               </span>
               <span className="row" style={{ gap: 4 }}>
                 <button
@@ -105,6 +107,33 @@ function Fold({ title, children, defaultOpen = false }: { title: string; childre
   );
 }
 
+/** The answer, up front: fits / tight / doesn't fit, with the one number that matters and what to try next. */
+function VerdictCard({ a, loading }: { a?: SiteAssessment; loading: boolean }) {
+  const v = verdictFor(a, loading);
+  // re-trigger the pulse animation whenever the verdict changes
+  const key = `${v.level}-${Math.round(a?.coincidentKw ?? 0)}-${v.counts.crit}-${v.counts.warn}`;
+  return (
+    <div key={key} className={`verdict ${v.status}`} id="tour-verdict">
+      <div className="verdict-head">
+        <StatusDot status={v.status} />
+        <b>{v.title}</b>
+        {a && (
+          <span className="verdict-counts">
+            <span style={{ color: 'var(--ok)' }}>{v.counts.ok}</span> / <span style={{ color: 'var(--warn)' }}>{v.counts.warn}</span> / <span style={{ color: 'var(--crit)' }}>{v.counts.crit}</span>
+          </span>
+        )}
+      </div>
+      <div className="verdict-body">{v.summary}</div>
+      {v.advice && <div className="verdict-advice">{v.advice}</div>}
+      {a && (
+        <button className="btn small" style={{ marginTop: 6 }} onClick={() => document.getElementById('tour-impact')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+          See every traffic light ↓
+        </button>
+      )}
+    </div>
+  );
+}
+
 function SiteEditor({ site }: { site: Site }) {
   const updateSite = useStore((s) => s.updateSite);
   const assessments = useAssessments();
@@ -118,6 +147,7 @@ function SiteEditor({ site }: { site: Site }) {
       <div className="field">
         <input type="text" className="wide" value={site.name} onChange={(e) => set({ name: e.target.value })} placeholder="Site name" />
       </div>
+      <VerdictCard a={a} loading={!!(live.loading.transformers || live.loading.feeders || live.loading.structures)} />
 
       <h3 id="tour-chargers" style={{ marginTop: 6 }}>
         Chargers <Help text="How many plugs of each kind. Level 2 = overnight-speed (like a dryer outlet); DC fast = 20-minute charging. Adding them up gives the sticker rating (nameplate). Fast chargers need the higher-voltage 460 V type of transformer, so the simulator looks for one of those first." />

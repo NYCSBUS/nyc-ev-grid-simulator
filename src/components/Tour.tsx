@@ -161,7 +161,7 @@ function buildSteps(): Step[] {
       element: '#tour-search',
       title: 'Question 1 · “Can we plug a big fast-charging station in at Roosevelt Ave & 82nd St?”',
       description:
-        'A developer wants 8 fast chargers in Jackson Heights — enough to charge a car in 20 minutes each. Normally you would type the address here and click <i>Put chargers here</i>. The tour will place it for you on the next step.',
+        'A developer wants 8 fast chargers in Jackson Heights — enough to charge a car in 20 minutes each. Normally you would type the address here and click <i>Put chargers here</i>. The tour will place it for you on the next step. Watch the banner at the top of the map — it gives the answer the moment the grid data arrives, and updates every time you change a charger.',
       side: 'bottom',
     },
     {
@@ -189,10 +189,10 @@ function buildSteps(): Step[] {
       side: 'right',
     },
     {
-      element: '#tour-impact',
+      element: '#tour-verdict',
       title: 'Answer 1: not as designed',
       description:
-        'The traffic lights below compare this station’s rush-hour load with the <b>room left</b> on each piece of nearby equipment. Here the nearby taps are the smaller 208 V kind with little room, and the underground <b>vaults</b> (the rooms under manhole covers where cables join) have only a few dozen kW spare — so most go <b>red</b>. No street mains are listed because in this part of Queens the grid is a <b>web</b> rather than a single pipe (more on that later). Bottom line: this exact corner would need Con Edison to install new equipment.',
+        'The verdict card gives the answer up front, and the same banner floats over the map. Underneath, the traffic lights compare this station’s rush-hour load with the <b>room left</b> on each piece of nearby equipment. On the map, dashed lines show where the load goes and each tag says how full that equipment gets. Here the nearby taps are the smaller 208 V kind with little room, and the underground <b>vaults</b> (the rooms under manhole covers where cables join) have only a few dozen kW spare — so most go <b>red</b>. No street mains are listed because in this part of Queens the grid is a <b>web</b> rather than a single pipe (more on that later). Bottom line: this exact corner would need Con Edison to install new equipment.',
       dyn: () => statusLine(assessmentFor(HUB)),
       side: 'right',
     },
@@ -264,7 +264,7 @@ function buildSteps(): Step[] {
       side: 'left',
     },
     {
-      element: '#tour-impact',
+      element: '#tour-verdict',
       title: 'Answer 3: it fits, and it qualifies for the bigger grant',
       description:
         'Overnight chargers are small loads, so the nearby taps swallow it with room to spare — all green. Because the site is in a DAC, the cost section later uses the <b>90 %</b> grant rate for the wiring work instead of 50 %.',

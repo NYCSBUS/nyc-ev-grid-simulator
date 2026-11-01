@@ -897,6 +897,105 @@ table.data tr:hover td {
   color: var(--muted);
 }
 
+/* ---------- verdict ---------- */
+.verdict {
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--unknown);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin: 8px 0 12px;
+  background: var(--bg);
+  animation: verdict-pop 0.6s ease-out;
+}
+.verdict.ok {
+  border-left-color: var(--ok);
+}
+.verdict.warn {
+  border-left-color: var(--warn);
+}
+.verdict.crit {
+  border-left-color: var(--crit);
+}
+.verdict-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.verdict-counts {
+  margin-left: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.verdict-body {
+  margin-top: 6px;
+  color: #cbd5e1;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.verdict-advice {
+  margin-top: 6px;
+  color: var(--accent);
+  font-size: 12px;
+}
+@keyframes verdict-pop {
+  0% {
+    transform: scale(0.98);
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.6);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 14px rgba(56, 189, 248, 0);
+  }
+}
+.verdict-banner {
+  left: 50%;
+  top: 12px;
+  transform: translateX(-50%);
+  max-width: min(640px, calc(100% - 420px));
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: rgba(23, 29, 37, 0.95);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--unknown);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  animation: verdict-pop 0.6s ease-out;
+}
+.verdict-banner.ok {
+  border-left-color: var(--ok);
+}
+.verdict-banner.warn {
+  border-left-color: var(--warn);
+}
+.verdict-banner.crit {
+  border-left-color: var(--crit);
+}
+.verdict-banner .status {
+  margin-top: 4px;
+}
+.verdict-banner .vb-title {
+  font-size: 13px;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.verdict-banner .vb-sub {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+.map-status {
+  top: auto;
+  bottom: 40px;
+}
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed;
