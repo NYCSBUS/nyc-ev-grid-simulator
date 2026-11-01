@@ -155,6 +155,7 @@ export function MapView() {
   const popupRef = useRef<mapboxgl.Popup | null>(null);
 
   const rawLayers = useStore((s) => s.layers);
+  const layerOpacity = useStore((s) => s.layerOpacity);
   const filters = useStore((s) => s.filters);
   const tab = useStore((s) => s.tab);
   const drawer = useStore((s) => s.drawer);
@@ -715,6 +716,31 @@ export function MapView() {
     map.setFilter('tracts-fill', tf);
     map.setFilter('tracts-line', tf);
   }, [layers, filters, area, styleNonce, mode]);
+
+  // ---------- per-layer opacity (user-adjustable in the Layers drawer) ----------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready() || !map) return;
+    const k = (key: keyof LayerVisibility) => layerOpacity[key] ?? 1;
+    const setP = (id: string, prop: string, v: any) => map.getLayer(id) && map.setPaintProperty(id, prop as any, v);
+    setP('transformers-circle', 'circle-opacity', k('transformers'));
+    setP('transformers-circle', 'circle-stroke-opacity', k('transformers'));
+    setP('feeders-line', 'line-opacity', 0.9 * k('feeders'));
+    setP('feeders33kv-line', 'line-opacity', 0.8 * k('feeders33kv'));
+    setP('structures-circle', 'circle-opacity', k('structures'));
+    setP('structures-circle', 'circle-stroke-opacity', k('structures'));
+    setP('buildings-fill', 'fill-extrusion-opacity', 0.75 * k('buildings'));
+    setP('msplates-fill', 'fill-opacity', 0.35 * k('msplates'));
+    setP('msplates-line', 'line-opacity', 0.5 * k('msplates'));
+    setP('networks-fill', 'fill-opacity', ['*', ['case', ['to-boolean', ['feature-state', 'status']], 0.18, 0.08], k('networks')]);
+    setP('networks-line', 'line-opacity', 0.9 * k('networks'));
+    setP('networks-label', 'text-opacity', k('networks'));
+    setP('dac-fill', 'fill-opacity', 0.12 * k('dac'));
+    setP('dac-line', 'line-opacity', k('dac'));
+    setP('nws-line', 'line-opacity', k('nws'));
+    setP('tracts-fill', 'fill-opacity', 0.65 * k('tracts'));
+    setP('tracts-line', 'line-opacity', k('tracts'));
+  }, [layerOpacity, styleNonce]);
 
   // ---------- choropleth / area stress ----------
   useEffect(() => {

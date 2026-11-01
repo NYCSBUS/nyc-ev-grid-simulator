@@ -23,7 +23,21 @@ const OUTLOOK_KEYS: Array<keyof LayerVisibility> = ['areaStress', 'dac', 'tracts
 
 export function LayersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
   const layers = useStore((s) => s.layers);
-  const setLayers = useStore((s) => s.setLayers);
+  const setLayersRaw = useStore((s) => s.setLayers);
+  const opacity = useStore((s) => s.layerOpacity);
+  const setOpacity = useStore((s) => s.setLayerOpacity);
+  const exclusive = useStore((s) => s.exclusiveLayers);
+  const setExclusive = useStore((s) => s.setExclusiveLayers);
+  const keys = mode === 'sites' ? SITES_KEYS : OUTLOOK_KEYS;
+  // "One at a time": switching a layer on switches the other optional layers (everything but your sites) off
+  const setLayers = (patch: Partial<LayerVisibility>) => {
+    const [key, on] = Object.entries(patch)[0] as [keyof LayerVisibility, boolean];
+    if (exclusive && on && key !== 'sites') {
+      const off: Partial<LayerVisibility> = {};
+      for (const k of keys) if (k !== 'sites' && k !== key) off[k] = false;
+      setLayersRaw({ ...off, [key]: true });
+    } else setLayersRaw(patch);
+  };
   const zoom = useStore((s) => s.viewport.zoom);
   const live = useStore((s) => s.live);
   return (
@@ -31,8 +45,12 @@ export function LayersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
       <p className="muted" style={{ marginTop: 0 }}>
         {mode === 'sites' ? 'Equipment layers stream in as you zoom in.' : 'Grid zones are always outlined in Outlook.'} Zoom: {zoom.toFixed(1)}
       </p>
-      {LAYER_DEFS.filter((d) => (mode === 'sites' ? SITES_KEYS : OUTLOOK_KEYS).includes(d.key)).map((d) => (
-        <div key={d.key} className="row between" style={{ padding: '2px 0' }}>
+      <Check label="One layer at a time (less clutter)" checked={exclusive} onChange={setExclusive} help="When on, turning a layer on turns the others off, so you look at one thing at a time. Your sites always stay visible." />
+      <div className="muted" style={{ fontSize: 11, margin: '2px 0 6px' }}>
+        Tick a layer to show it; drag its slider to fade it.
+      </div>
+      {LAYER_DEFS.filter((d) => keys.includes(d.key)).map((d) => (
+        <div key={d.key} className="layer-row">
           <Check
             label={
               <span>
@@ -51,6 +69,18 @@ export function LayersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
             }
           />
           {live.loading[d.key] && <span className="muted">…</span>}
+          {layers[d.key] && d.key !== 'sites' && (
+            <input
+              type="range"
+              className="opacity"
+              min={0.1}
+              max={1}
+              step={0.05}
+              value={opacity[d.key] ?? 1}
+              onChange={(e) => setOpacity(d.key, +e.target.value)}
+              title={`Strength: ${Math.round((opacity[d.key] ?? 1) * 100)}%`}
+            />
+          )}
         </div>
       ))}
       {mode === 'sites' && (

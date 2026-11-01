@@ -1,4 +1,4 @@
-import type { AreaScenario, Filters, LayerVisibility, Scenario, Settings, Site } from '../types';
+import type { AreaScenario, Filters, LayerOpacity, LayerVisibility, Scenario, Settings, Site } from '../types';
 
 export const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -71,6 +71,9 @@ export const DEFAULT_LAYERS: LayerVisibility = {
   areaStress: true,
   satellite: false,
 };
+
+/** 1 = the layer's normal strength. Buildings are dimmed by default so the equipment dots stay readable. */
+export const DEFAULT_OPACITY: LayerOpacity = { buildings: 0.45, msplates: 0.8, tracts: 0.9, networks: 1, dac: 1 };
 
 export function newSite(lng: number, lat: number, partial: Partial<Site> = {}): Site {
   return {

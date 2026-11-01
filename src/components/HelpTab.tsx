@@ -6,47 +6,51 @@ const T = { text: '#e6edf3', muted: '#9aa7b4', line: '#2b3542', accent: '#38bdf8
 function GridHierarchy() {
   const box = (x: number, y: number, w: number, label: string, sub: string, color: string) => (
     <g>
-      <rect x={x} y={y} width={w} height={54} rx={8} fill="#1f2730" stroke={color} strokeWidth={1.5} />
-      <text x={x + w / 2} y={y + 22} textAnchor="middle" fill={T.text} fontSize={13} fontWeight={600}>
+      <rect x={x} y={y} width={w} height={56} rx={8} fill="#1f2730" stroke={color} strokeWidth={1.5} />
+      <text x={x + w / 2} y={y + 23} textAnchor="middle" fill={T.text} fontSize={13} fontWeight={600}>
         {label}
       </text>
-      <text x={x + w / 2} y={y + 40} textAnchor="middle" fill={T.muted} fontSize={11}>
+      <text x={x + w / 2} y={y + 42} textAnchor="middle" fill={T.muted} fontSize={11}>
         {sub}
       </text>
     </g>
   );
   const arrow = (x1: number, y1: number, x2: number, y2: number) => <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={T.muted} strokeWidth={1.5} markerEnd="url(#arr)" />;
   return (
-    <svg viewBox="0 0 900 300">
-      <defs>
-        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-          <path d="M0,0 L8,4 L0,8 z" fill={T.muted} />
-        </marker>
-      </defs>
-      {box(20, 20, 160, 'Reservoir', 'power plants, 138–345 kV', '#c084fc')}
-      {arrow(180, 47, 220, 47)}
-      {box(220, 20, 170, 'Pumping station', 'substation, steps down to 13–27 kV', '#c084fc')}
-      {arrow(390, 47, 430, 47)}
-      {box(430, 20, 190, 'Street main = feeder', 'room left published in MW', T.accent)}
-      {arrow(620, 47, 660, 47)}
-      {box(660, 20, 220, 'Tap = transformer', 'room left: < 200 … > 1000 kVA', T.ok)}
-      {arrow(770, 74, 770, 120)}
-      {box(640, 120, 250, 'Your building (208 V or 460 V)', 'the charging site plugs in here', T.warn)}
-      <text x={20} y={150} fill={T.text} fontSize={13} fontWeight={600}>
-        In the densest parts of the city the grid is a web, not a single pipe. Con Edison describes it in three sizes:
-      </text>
-      {box(20, 170, 200, 'Grid zone = network', '89 zones, roughly neighbourhood-sized', T.coned)}
-      {arrow(220, 197, 260, 197)}
-      {box(260, 170, 200, 'Map sheet = M&S plate', 'a page of the underground atlas', T.coned)}
-      {arrow(460, 197, 500, 197)}
-      {box(500, 170, 200, 'Vault = structure', 'the room under a manhole cover', T.coned)}
-      <text x={20} y={262} fill={T.muted} fontSize={12}>
-        In a web, many taps feed one shared underground grid, so a new load is spread across neighbours. The simulator's "web" setting
-      </text>
-      <text x={20} y={280} fill={T.muted} fontSize={12}>
-        splits a site's load 60 / 25 / 15 % over the three nearest taps; the "single pipe" setting puts all of it on the nearest one.
-      </text>
-    </svg>
+    <>
+      <svg viewBox="0 0 1000 330">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill={T.muted} />
+          </marker>
+        </defs>
+        <text x={20} y={22} fill={T.muted} fontSize={12}>
+          Most of the city: one pipe per building
+        </text>
+        {box(20, 36, 190, 'Reservoir', 'power plants · 138–345 kV', '#c084fc')}
+        {arrow(210, 64, 250, 64)}
+        {box(250, 36, 210, 'Pumping station', 'substation · down to 13–27 kV', '#c084fc')}
+        {arrow(460, 64, 500, 64)}
+        {box(500, 36, 210, 'Street main = feeder', 'room left published in MW', T.accent)}
+        {arrow(710, 64, 750, 64)}
+        {box(750, 36, 230, 'Tap = transformer', 'room left: < 200 … > 1000 kVA', T.ok)}
+        {arrow(865, 92, 865, 130)}
+        {box(700, 130, 280, 'Your building · 208 V or 460 V', 'the charging site plugs in here', T.warn)}
+
+        <text x={20} y={230} fill={T.muted} fontSize={12}>
+          Densest areas: a web — many taps share one underground grid
+        </text>
+        {box(20, 244, 250, 'Grid zone = network', '89 zones, neighbourhood-sized', T.coned)}
+        {arrow(270, 272, 310, 272)}
+        {box(310, 244, 250, 'Map sheet = M&S plate', 'a page of the underground atlas', T.coned)}
+        {arrow(560, 272, 600, 272)}
+        {box(600, 244, 250, 'Vault = structure', 'the room under a manhole cover', T.coned)}
+      </svg>
+      <p className="fig-note">
+        In a web, a new load is spread across neighbours. The simulator's "web" setting splits a site's load 60 / 25 / 15 % over the three nearest taps; the "single pipe" setting puts all of it
+        on the nearest one.
+      </p>
+    </>
   );
 }
 
@@ -70,133 +74,135 @@ function HeadroomDiagram() {
     );
   };
   return (
-    <svg viewBox="0 0 700 250">
-      <line x1={40} y1={40} x2={660} y2={40} stroke={T.line} strokeDasharray="4 4" />
-      <text x={45} y={34} fill={T.muted} fontSize={11}>
-        the pipe is full here
-      </text>
-      {bar(80, 'Today', 100, 55, 0, 'already in use', '#334155')}
-      {bar(220, '+ small garage', 100, 55, 20, 'Green (< 60 % of room)', T.ok)}
-      {bar(360, '+ fast-charge hub', 100, 55, 38, 'Amber (60–100 %)', T.warn)}
-      {bar(500, '+ truck depot', 100, 55, 60, 'Red (over 100 %)', T.crit)}
-      <text x={40} y={235} fill={T.muted} fontSize={12}>
-        Grey = what the pipe already carries. Colour = what your site adds at rush hour. Con Edison publishes the white space (room left), not the pipe size.
-      </text>
-    </svg>
+    <>
+      <svg viewBox="0 0 700 250">
+        <line x1={40} y1={40} x2={660} y2={40} stroke={T.line} strokeDasharray="4 4" />
+        <text x={45} y={34} fill={T.muted} fontSize={11}>
+          the pipe is full here
+        </text>
+        {bar(80, 'Today', 100, 55, 0, 'already in use', '#64748b')}
+        {bar(220, '+ small garage', 100, 55, 20, 'Green (< 60 % of room)', T.ok)}
+        {bar(360, '+ fast-charge hub', 100, 55, 38, 'Amber (60–100 %)', T.warn)}
+        {bar(500, '+ truck depot', 100, 55, 60, 'Red (over 100 %)', T.crit)}
+      </svg>
+      <p className="fig-note">
+        Grey = what the pipe already carries. Colour = what your site adds at rush hour. Con Edison publishes the white space (room left), not the size of the pipe.
+      </p>
+    </>
   );
 }
 
+const PROFILE_COLORS: Record<string, string> = { residential: '#f59e0b', workplace: '#38bdf8', public: '#a78bfa', fleet: '#22c55e', transit: '#f472b6' };
+
 function ProfilesDiagram() {
   const W = 760;
-  const H = 180;
   const x0 = 50;
   const y0 = 150;
   const px = (h: number) => x0 + (h / 23) * (W - x0 - 20);
   const py = (v: number) => y0 - v * 120;
-  const colors: Record<string, string> = { residential: '#f59e0b', workplace: '#38bdf8', public: '#a78bfa', fleet: '#22c55e', transit: '#f472b6' };
   return (
-    <svg viewBox={`0 0 ${W} ${H + 60}`}>
-      <rect x={px(16.5)} y={20} width={px(18.5) - px(16.5)} height={y0 - 20} fill="rgba(56,189,248,0.12)" />
-      <text x={px(17.5)} y={14} textAnchor="middle" fill={T.accent} fontSize={11}>
-        grid rush hour
-      </text>
-      {Object.entries(PROFILES).map(([k, p]) => (
-        <polyline key={k} fill="none" stroke={colors[k]} strokeWidth={2} points={p.shape.map((v, h) => `${px(h)},${py(v)}`).join(' ')} />
-      ))}
-      <polyline fill="none" stroke={colors.residential} strokeWidth={2} strokeDasharray="5 4" points={PROFILES.residential.managedShape.map((v, h) => `${px(h)},${py(v)}`).join(' ')} />
-      <line x1={x0} y1={y0} x2={W - 20} y2={y0} stroke={T.line} />
-      {[0, 6, 12, 18, 23].map((h) => (
-        <text key={h} x={px(h)} y={y0 + 16} textAnchor="middle" fill={T.muted} fontSize={11}>
-          {h}:00
+    <>
+      <svg viewBox={`0 0 ${W} 175`}>
+        <rect x={px(16.5)} y={20} width={px(18.5) - px(16.5)} height={y0 - 20} fill="rgba(56,189,248,0.12)" />
+        <text x={px(17.5)} y={14} textAnchor="middle" fill={T.accent} fontSize={11}>
+          grid rush hour
         </text>
-      ))}
-      <text x={10} y={py(1) + 4} fill={T.muted} fontSize={11}>
-        busiest
-      </text>
-      <text x={10} y={y0 + 4} fill={T.muted} fontSize={11}>
-        idle
-      </text>
-      {Object.entries(PROFILES).map(([k, p], i) => (
-        <g key={k} transform={`translate(${x0 + i * 145}, ${H + 25})`}>
-          <rect width={14} height={3} y={6} fill={colors[k]} />
-          <text x={20} y={11} fill={T.text} fontSize={11}>
-            {p.label.split(' /')[0].split(' (')[0]}
+        {Object.entries(PROFILES).map(([k, p]) => (
+          <polyline key={k} fill="none" stroke={PROFILE_COLORS[k]} strokeWidth={2} points={p.shape.map((v, h) => `${px(h)},${py(v)}`).join(' ')} />
+        ))}
+        <polyline fill="none" stroke={PROFILE_COLORS.residential} strokeWidth={2} strokeDasharray="5 4" points={PROFILES.residential.managedShape.map((v, h) => `${px(h)},${py(v)}`).join(' ')} />
+        <line x1={x0} y1={y0} x2={W - 20} y2={y0} stroke={T.line} />
+        {[0, 6, 12, 18, 23].map((h) => (
+          <text key={h} x={px(h)} y={y0 + 16} textAnchor="middle" fill={T.muted} fontSize={11}>
+            {h}:00
           </text>
-        </g>
-      ))}
-      <g transform={`translate(${x0}, ${H + 45})`}>
-        <line x1={0} x2={14} y1={7} y2={7} stroke={colors.residential} strokeWidth={2} strokeDasharray="5 4" />
-        <text x={20} y={11} fill={T.muted} fontSize={11}>
-          home charging with smart charging on (pushed to after 10 PM)
+        ))}
+        <text x={10} y={py(1) + 4} fill={T.muted} fontSize={11}>
+          busiest
         </text>
-      </g>
-    </svg>
+        <text x={10} y={y0 + 4} fill={T.muted} fontSize={11}>
+          idle
+        </text>
+      </svg>
+      <div className="fig-legend">
+        {Object.entries(PROFILES).map(([k, p]) => (
+          <span key={k}>
+            <i style={{ background: PROFILE_COLORS[k] }} /> {p.label}
+          </span>
+        ))}
+        <span>
+          <i style={{ background: 'transparent', borderTop: `2px dashed ${PROFILE_COLORS.residential}`, height: 0 }} /> Home charging with smart charging on (pushed to after 10 PM)
+        </span>
+      </div>
+    </>
   );
 }
 
 function DiversityDiagram() {
+  const fill = [80, 80, 55, 30, 12, 0];
   return (
-    <svg viewBox="0 0 760 170">
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <g key={i} transform={`translate(${30 + i * 60}, 30)`}>
-          <rect width={40} height={80} rx={4} fill="#1f2730" stroke={T.line} />
-          <rect width={40} height={[80, 80, 55, 30, 12, 0][i]} y={80 - [80, 80, 55, 30, 12, 0][i]} rx={4} fill={i < 2 ? T.accent : i < 4 ? '#818cf8' : '#334155'} />
-          <text x={20} y={100} textAnchor="middle" fill={T.muted} fontSize={10}>
-            plug {i + 1}
+    <>
+      <svg viewBox="0 0 760 130">
+        {fill.map((f, i) => (
+          <g key={i} transform={`translate(${30 + i * 60}, 15)`}>
+            <rect width={40} height={80} rx={4} fill="#1f2730" stroke={T.line} />
+            <rect width={40} height={f} y={80 - f} rx={4} fill={i < 2 ? T.accent : i < 4 ? '#818cf8' : '#334155'} />
+            <text x={20} y={100} textAnchor="middle" fill={T.muted} fontSize={10}>
+              plug {i + 1}
+            </text>
+          </g>
+        ))}
+        <g transform="translate(410, 15)">
+          <rect width={340} height={80} rx={8} fill="#1f2730" stroke={T.warn} />
+          <text x={170} y={32} textAnchor="middle" fill={T.text} fontSize={11.5} fontWeight={600}>
+            load each hour = sticker × in-use × taper × daily shape
+          </text>
+          <text x={170} y={56} textAnchor="middle" fill={T.muted} fontSize={10.5}>
+            then a battery trims the top; rush-hour load = the 5 PM value
           </text>
         </g>
-      ))}
-      <text x={30} y={140} fill={T.text} fontSize={12}>
-        Six 150 kW plugs = 900 kW on the sticker. At the busiest hour only five have a car (83 % in use), and cars that are nearly full charge
-      </text>
-      <text x={30} y={158} fill={T.text} fontSize={12}>
-        slowly — like a phone — so the average plug draws ~57 % of its maximum. Real peak ≈ 900 × 0.83 × 0.57 ≈ 430 kW.
-      </text>
-      <g transform="translate(430, 30)">
-        <rect width={300} height={80} rx={8} fill="#1f2730" stroke={T.warn} />
-        <text x={150} y={30} textAnchor="middle" fill={T.text} fontSize={12} fontWeight={600}>
-          load each hour = sticker × in-use × taper × daily shape
-        </text>
-        <text x={150} y={55} textAnchor="middle" fill={T.muted} fontSize={11}>
-          then a battery trims the top; rush-hour load = the 5 PM value
-        </text>
-      </g>
-    </svg>
+      </svg>
+      <p className="fig-note">
+        Six 150 kW plugs = 900 kW on the sticker. At the busiest hour only five have a car (83 % in use), and cars that are nearly full charge slowly — like a phone — so the average plug draws
+        about 57 % of its maximum. Real peak ≈ 900 × 0.83 × 0.57 ≈ <b>430 kW</b>.
+      </p>
+    </>
   );
 }
 
 function AreaDiagram() {
+  const steps: Array<[string, string, string]> = [
+    ['Count the cars', 'per neighbourhood, from the Census', '#38bdf8'],
+    ['× share that are electric', 'depends on the year and adoption path', '#a78bfa'],
+    ['× load per EV at 5 PM', 'home share, how many at once, smart charging', '#f59e0b'],
+    ['Add up per grid zone', "compare with the zone's published capacity", '#22c55e'],
+  ];
   return (
-    <svg viewBox="0 0 760 200">
-      {[
-        ['Count the cars', 'per neighbourhood, from the Census', '#38bdf8'],
-        ['× share that are electric', 'depends on the year and adoption path', '#a78bfa'],
-        ['× load per EV at 5 PM', 'who charges at home, how many at once, smart charging', '#f59e0b'],
-        ['Add up per grid zone', 'compare with the zone\u2019s published capacity', '#22c55e'],
-      ].map(([a, b, c], i) => (
-        <g key={a} transform={`translate(${20 + i * 185}, 40)`}>
-          <rect width={170} height={70} rx={8} fill="#1f2730" stroke={c} strokeWidth={1.5} />
-          <text x={85} y={28} textAnchor="middle" fill={T.text} fontSize={12} fontWeight={600}>
-            {a}
-          </text>
-          <foreignObject x={6} y={36} width={158} height={32}>
-            <div style={{ color: T.muted, fontSize: 10, textAlign: 'center', lineHeight: 1.2 }}>{b}</div>
-          </foreignObject>
-          {i < 3 && <path d={`M170,35 L185,35`} stroke={T.muted} strokeWidth={1.5} markerEnd="url(#arr2)" />}
-        </g>
-      ))}
-      <defs>
-        <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
-          <path d="M0,0 L8,4 L0,8 z" fill={T.muted} />
-        </marker>
-      </defs>
-      <text x={20} y={150} fill={T.muted} fontSize={12}>
-        Example: a neighbourhood with 2,000 cars × 15 % electric (2030, Policy path) = 300 EVs × 1.1 kW each at 5 PM ≈ 330 kW. Add the ~30
-      </text>
-      <text x={20} y={168} fill={T.muted} fontSize={12}>
-        neighbourhoods in a grid zone → ~10 MW, compared with the zone's published range (e.g. 0–25 MW → mid-point 12.5) to flag where work is needed first.
-      </text>
-    </svg>
+    <>
+      <svg viewBox="0 0 800 110">
+        <defs>
+          <marker id="arr2" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+            <path d="M0,0 L8,4 L0,8 z" fill={T.muted} />
+          </marker>
+        </defs>
+        {steps.map(([a, b, c], i) => (
+          <g key={a} transform={`translate(${10 + i * 198}, 15)`}>
+            <rect width={180} height={76} rx={8} fill="#1f2730" stroke={c} strokeWidth={1.5} />
+            <text x={90} y={30} textAnchor="middle" fill={T.text} fontSize={12} fontWeight={600}>
+              {a}
+            </text>
+            <foreignObject x={6} y={40} width={168} height={34}>
+              <div style={{ color: T.muted, fontSize: 10.5, textAlign: 'center', lineHeight: 1.25 }}>{b}</div>
+            </foreignObject>
+            {i < 3 && <path d="M180,38 L196,38" stroke={T.muted} strokeWidth={1.5} markerEnd="url(#arr2)" />}
+          </g>
+        ))}
+      </svg>
+      <p className="fig-note">
+        Example: a neighbourhood with 2,000 cars × 15 % electric (2030, Policy path) = 300 EVs × 1.1 kW each at 5 PM ≈ 330 kW. Add the ~30 neighbourhoods in a grid zone → ~10 MW, compared with
+        the zone's published range (e.g. 0–25 MW → mid-point 12.5) to flag where work is needed first.
+      </p>
+    </>
   );
 }
 

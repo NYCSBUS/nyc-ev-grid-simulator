@@ -115,6 +115,8 @@ export interface LayerVisibility {
   satellite: boolean;
 }
 
+export type LayerOpacity = Partial<Record<keyof LayerVisibility, number>>;
+
 export interface Scenario {
   id: string;
   name: string;

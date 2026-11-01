@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Point, Polygon, MultiPolygon, LineString, MultiLineString } from 'geojson';
-import type { AreaScenario, FC, Filters, LayerVisibility, Scenario, Settings, Site } from '../types';
-import { DEFAULT_FILTERS, DEFAULT_LAYERS, defaultScenario, uid } from './defaults';
+import type { AreaScenario, FC, Filters, LayerOpacity, LayerVisibility, Scenario, Settings, Site } from '../types';
+import { DEFAULT_FILTERS, DEFAULT_LAYERS, DEFAULT_OPACITY, defaultScenario, uid } from './defaults';
 import { readScenarioFromUrl } from './url';
 
 export type Tab = 'sites' | 'outlook' | 'results' | 'scenarios' | 'settings' | 'learn';
@@ -9,7 +9,7 @@ export type Tab = 'sites' | 'outlook' | 'results' | 'scenarios' | 'settings' | '
 export type Drawer = 'layers' | 'filters' | null;
 
 const LS_SAVED = 'evsim.saved.v1';
-const LS_UI = 'evsim.ui.v2';
+const LS_UI = 'evsim.ui.v3';
 const LS_ACTIVE = 'evsim.active.v1';
 const LS_MISSIONS = 'evsim.missions.v1';
 
@@ -64,6 +64,9 @@ export interface AppState {
   tourRequested: boolean;
   sidebarOpen: boolean;
   layers: LayerVisibility;
+  layerOpacity: LayerOpacity;
+  /** When on, switching a map layer on switches the other optional layers off. */
+  exclusiveLayers: boolean;
   filters: Filters;
   staticData: StaticData;
   live: LiveData;
@@ -88,6 +91,8 @@ export interface AppState {
   setSettings: (patch: Partial<Settings>) => void;
   setCostParams: (patch: Partial<Settings['cost']>) => void;
   setLayers: (patch: Partial<LayerVisibility>) => void;
+  setLayerOpacity: (key: keyof LayerVisibility, v: number) => void;
+  setExclusiveLayers: (b: boolean) => void;
   setFilters: (patch: Partial<Filters>) => void;
   resetFilters: () => void;
   saveScenario: (name?: string) => void;
@@ -126,7 +131,9 @@ export const useStore = create<AppState>((set, get) => ({
   placing: false,
   tourRequested: false,
   sidebarOpen: true,
-  layers: load(LS_UI, { layers: DEFAULT_LAYERS, filters: DEFAULT_FILTERS }).layers,
+  layers: load(LS_UI, { layers: DEFAULT_LAYERS, filters: DEFAULT_FILTERS, layerOpacity: DEFAULT_OPACITY, exclusiveLayers: false }).layers,
+  layerOpacity: { ...DEFAULT_OPACITY, ...load(LS_UI, { layerOpacity: {} as LayerOpacity }).layerOpacity },
+  exclusiveLayers: load(LS_UI, { exclusiveLayers: false }).exclusiveLayers,
   filters: load(LS_UI, { layers: DEFAULT_LAYERS, filters: DEFAULT_FILTERS }).filters,
   staticData: {},
   live: { transformers: emptyFC(), feeders: emptyFC(), structures: emptyFC(), buildings: emptyFC(), feeders33kv: emptyFC(), loading: {}, errors: {} },
@@ -161,6 +168,8 @@ export const useStore = create<AppState>((set, get) => ({
   setSettings: (patch) => set((s) => ({ scenario: { ...s.scenario, settings: { ...s.scenario.settings, ...patch } } })),
   setCostParams: (patch) => set((s) => ({ scenario: { ...s.scenario, settings: { ...s.scenario.settings, cost: { ...s.scenario.settings.cost, ...patch } } } })),
   setLayers: (patch) => set((s) => ({ layers: { ...s.layers, ...patch } })),
+  setLayerOpacity: (key, v) => set((s) => ({ layerOpacity: { ...s.layerOpacity, [key]: v } })),
+  setExclusiveLayers: (exclusiveLayers) => set({ exclusiveLayers }),
   setFilters: (patch) => set((s) => ({ filters: { ...s.filters, ...patch } })),
   resetFilters: () => set({ filters: DEFAULT_FILTERS }),
   saveScenario: (name) => {
@@ -195,7 +204,8 @@ export const useStore = create<AppState>((set, get) => ({
 // Persist slices
 useStore.subscribe((s, prev) => {
   if (s.saved !== prev.saved) localStorage.setItem(LS_SAVED, JSON.stringify(s.saved));
-  if (s.layers !== prev.layers || s.filters !== prev.filters) localStorage.setItem(LS_UI, JSON.stringify({ layers: s.layers, filters: s.filters }));
+  if (s.layers !== prev.layers || s.filters !== prev.filters || s.layerOpacity !== prev.layerOpacity || s.exclusiveLayers !== prev.exclusiveLayers)
+    localStorage.setItem(LS_UI, JSON.stringify({ layers: s.layers, filters: s.filters, layerOpacity: s.layerOpacity, exclusiveLayers: s.exclusiveLayers }));
   if (s.scenario !== prev.scenario) localStorage.setItem(LS_ACTIVE, JSON.stringify(s.scenario));
   if (s.missionsDone !== prev.missionsDone) localStorage.setItem(LS_MISSIONS, JSON.stringify(s.missionsDone));
 });
