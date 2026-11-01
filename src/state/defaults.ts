@@ -57,9 +57,9 @@ export const DEFAULT_FILTERS: Filters = {
 };
 
 export const DEFAULT_LAYERS: LayerVisibility = {
-  networks: true,
+  networks: false,
   msplates: false,
-  dac: true,
+  dac: false,
   nws: false,
   tracts: false,
   transformers: true,

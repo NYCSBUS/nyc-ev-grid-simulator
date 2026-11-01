@@ -9,7 +9,7 @@ import { nameplateKw } from '../sim/model';
 import type { Scenario, SiteAssessment } from '../types';
 import { fmt } from './ui';
 
-const LS_KEY = 'evsim.tour.seen.v3';
+const LS_KEY = 'evsim.tour.seen.v4';
 const TOUR_NAME = 'Tour walkthrough';
 const HUB = 'Roosevelt Ave fast hub (tour)';
 const GARAGE = 'Mott Haven L2 garage (tour)';
@@ -150,8 +150,8 @@ function buildSteps(): Step[] {
       description:
         'Think of the power grid as plumbing. Big pipes (<b>feeders</b>) run under the street; a smaller tap (<b>transformer</b>) serves each block or building. Every pipe has only so much <b>room left</b> before it is full. An EV analyst’s job is to work out where new chargers can plug in without overfilling a pipe.<br/><br/>This tour drives the app for you and answers five questions that come up every week. Your own work is set aside and comes back at the end. Press <b>Next</b> — each step changes something on screen.',
       setup: () => {
-        st().setTab('map');
-        st().setPanel('scenario');
+        st().setTab('sites');
+        st().setDrawer(null);
         st().setSidebarOpen(true);
         st().requestFlyTo([-73.93, 40.75], 10.8);
       },
@@ -172,7 +172,7 @@ function buildSteps(): Step[] {
       setup: () => {
         addHub();
         selectAndFly(HUB, 16.2);
-        st().setPanel('scenario');
+        st().setDrawer(null);
       },
       side: 'left',
     },
@@ -216,28 +216,29 @@ function buildSteps(): Step[] {
       side: 'right',
     },
     {
-      element: '#tour-rail-filters',
+      element: '#tour-drawer',
       title: 'Hunt for the right taps nearby',
       description:
-        'The <b>Filters</b> panel is now showing only the taps fast chargers need: <b>460 V</b> with at least <b>500 kVA</b> of room. The map zoomed out a notch. Every dot you still see is a plausible place for a fast-charging station. Where dots cluster, a developer can build; where there are none, Con Edison would need to add equipment first.',
+        'The <b>Filters</b> drawer (opened from the button at the top-right of the map) is now showing only the taps fast chargers need: <b>460 V</b> with at least <b>500 kVA</b> of room. The map zoomed out a notch. Every dot you still see is a plausible place for a fast-charging station. Where dots cluster, a developer can build; where there are none, Con Edison would need to add equipment first.',
       setup: () => {
-        st().setPanel('filters');
+        st().setDrawer('filters');
         st().setFilters({ xfmrVoltage: ['460'], xfmrBuckets: ['500 kVA to 1000 kVA', '> 1000 kVA'] });
         const s = siteByName(HUB);
         if (s) st().requestFlyTo([s.lng, s.lat], 14.6);
       },
-      side: 'right',
+      side: 'left',
     },
     {
       element: '#tour-map',
       title: 'Reading the result',
+      setup: () => st().setDrawer(null),
       description:
         'White-ringed dots are the good candidates. Click any dot to see exactly how much room it has. In real life you would drag the station pin onto the best candidate, or widen the search circle in the site editor, and watch the traffic lights change.',
       side: 'left',
     },
     /* ---------- Q3 ---------- */
     {
-      element: '#tour-rail-filters',
+      element: '#tour-drawer',
       title: 'Question 3 · “Where should a fairness-focused home-charging program go?”',
       description:
         'Filters are reset. The map now shades every neighbourhood by <b>how many households have no car</b>, and outlines in orange the areas New York State has flagged as <b>Disadvantaged Communities</b> (DACs) — places that get the larger grants. The South Bronx stands out: lots of apartment buildings, few cars today, no driveways to charge in. Shared slower chargers in apartment garages (<b>Level 2</b>) are the fix, and DAC siting unlocks the bigger grant.',
@@ -245,10 +246,10 @@ function buildSteps(): Step[] {
         st().resetFilters();
         st().setFilters({ acsVariable: 'no_veh_share' });
         st().setLayers({ tracts: true, dac: true });
-        st().setPanel('filters');
+        st().setDrawer('filters');
         st().requestFlyTo([-73.915, 40.825], 12.3);
       },
-      side: 'right',
+      side: 'left',
     },
     {
       element: '#tour-map',
@@ -258,7 +259,7 @@ function buildSteps(): Step[] {
       setup: () => {
         addGarage();
         selectAndFly(GARAGE, 16);
-        st().setPanel('scenario');
+        st().setDrawer(null);
       },
       side: 'left',
     },
@@ -272,16 +273,16 @@ function buildSteps(): Step[] {
     },
     /* ---------- Q4 ---------- */
     {
-      element: '#tour-area',
+      element: '#tour-outlook',
       title: 'Question 4 · “How much extra load will the Bronx add by 2035, and where does it bite first?”',
       description:
-        'Now zoom out from single sites to a whole borough. The <b>Area-wide</b> model is switched <b>on</b>: year 2035, the <b>Policy</b> adoption path (New York’s rule that all new cars sold are electric by 2035), Bronx only. The recipe is simple: count the cars in each neighbourhood (Census), assume a share go electric, work out how many are plugged in at 5 PM, and add it up for each Con Edison <b>grid zone</b> (a “network”).',
+        'Now zoom out from single sites to a whole borough. We are in the <b>Outlook</b> tab: year 2035, the <b>Policy</b> adoption path (New York’s rule that all new cars sold are electric by 2035), Bronx only. The recipe is simple: count the cars in each neighbourhood (Census), assume a share go electric, work out how many are plugged in at 5 PM, and add it up for each Con Edison <b>grid zone</b> (a “network”).',
       setup: () => {
+        st().setTab('outlook');
         st().setArea({ enabled: true, year: 2035, curve: 'policy', boroughs: ['Bronx'], dacOnly: false });
         st().setFilters({ acsVariable: 'none' });
         st().setLayers({ tracts: false, areaStress: true });
         st().selectSite(null);
-        st().setPanel('scenario');
         st().requestFlyTo([-73.88, 40.85], 11.4);
       },
       dyn: areaLine,
@@ -298,8 +299,8 @@ function buildSteps(): Step[] {
       element: '#tour-networktable',
       title: 'Answer 4: the to-do list for the grid planners',
       description:
-        'The Analytics tab ranks every grid zone by how full the new load would make it. Red rows are where Con Edison’s planners need to add equipment (or pay customers to shift load) first. The <b>DAC share</b> column shows how much of that growth is in disadvantaged neighbourhoods. The <b>CSV</b> button drops the table straight into Excel.',
-      setup: () => st().setTab('analytics'),
+        'The <b>Results</b> tab ranks every grid zone by how full the new load would make it. Red rows are where Con Edison’s planners need to add equipment (or pay customers to shift load) first. The <b>DAC share</b> column shows how much of that growth is in disadvantaged neighbourhoods. The <b>CSV</b> button drops the table straight into Excel.',
+      setup: () => st().setTab('results'),
       dyn: areaLine,
       side: 'top',
     },
@@ -328,23 +329,23 @@ function buildSteps(): Step[] {
     },
     /* ---------- wrap up ---------- */
     {
-      element: '#tour-rail-saved',
+      element: '#tour-tab-scenarios',
       title: 'Save, share, compare',
       description:
-        'Everything you set up — sites, borough-wide settings, price assumptions — fits in one share link. Save a few variations (for example “with smart charging” vs. “without”) and compare them in Analytics.',
-      setup: () => {
-        st().setTab('map');
-        st().setPanel('saved');
-      },
-      side: 'right',
+        'Everything you set up — sites, borough-wide settings, price assumptions — fits in one share link. The <b>Scenarios</b> tab saves a few variations (for example “with smart charging” vs. “without”) so you can compare them in Results.',
+      setup: () => st().setTab('scenarios'),
+      side: 'bottom',
     },
     {
-      element: '#tour-rail-missions',
+      element: '#tour-tab-learn',
       title: 'Keep practising',
       description:
-        '<b>Missions</b> pose more questions like these and check your answers automatically. Hover any <b>(?)</b> for a plain-English explanation; the <b>Help</b> tab has pictures of how the grid fits together. Finishing now brings your own scenario back.',
-      setup: () => st().setPanel('missions'),
-      side: 'right',
+        '<b>Missions</b> pose more questions like these and check your answers automatically. Hover any <b>(?)</b> for a plain-English explanation; the <b>Learn</b> tab has an illustrated guide to how the grid fits together, plus the missions. Finishing now brings your own scenario back.',
+      setup: () => {
+        st().setTab('learn');
+        st().setLearnView('missions');
+      },
+      side: 'bottom',
     },
   ];
 }
@@ -415,8 +416,8 @@ function runTour(onDone: () => void): { cancel: () => void } {
       st.importScenario(prev);
       st.setLayers(prevLayers);
       st.setFilters(prevFilters);
-      st.setTab('map');
-      st.setPanel('scenario');
+      st.setTab('sites');
+      st.setDrawer(null);
       st.setToast('Tour finished — your scenario is back; the walkthrough is kept under Saved');
       onDone();
     },

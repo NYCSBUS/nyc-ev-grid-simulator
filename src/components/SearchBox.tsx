@@ -35,7 +35,7 @@ export function SearchBox() {
     setOpen(false);
     setQ(r.name);
     setPending(r);
-    setTab('map');
+    setTab('sites');
     requestFlyTo([r.lng, r.lat], 16.5);
   };
 

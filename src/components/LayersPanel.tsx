@@ -18,17 +18,20 @@ const LAYER_DEFS: Array<{ key: keyof LayerVisibility; label: string; help: strin
   { key: 'areaStress', label: 'Borough-wide growth heat map', help: 'When borough-wide growth is on: neighbourhoods shaded by how much new EV load lands there, and grid zones coloured by traffic light.', source: 'Simulator' },
 ];
 
-export function LayersPanel() {
+const SITES_KEYS: Array<keyof LayerVisibility> = ['sites', 'transformers', 'feeders', 'structures', 'msplates', 'buildings', 'networks', 'dac', 'tracts', 'feeders33kv', 'nws'];
+const OUTLOOK_KEYS: Array<keyof LayerVisibility> = ['areaStress', 'dac', 'tracts', 'nws', 'sites'];
+
+export function LayersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
   const layers = useStore((s) => s.layers);
   const setLayers = useStore((s) => s.setLayers);
   const zoom = useStore((s) => s.viewport.zoom);
-  const meta = useStore((s) => s.staticData.meta);
   const live = useStore((s) => s.live);
   return (
     <div className="panel" id="tour-layers">
-      <h2>Layers</h2>
-      <p className="muted">Detailed layers stream in from Con Edison and NYC Open Data as you zoom in. Current zoom: {zoom.toFixed(1)}</p>
-      {LAYER_DEFS.map((d) => (
+      <p className="muted" style={{ marginTop: 0 }}>
+        {mode === 'sites' ? 'Equipment layers stream in as you zoom in.' : 'Grid zones are always outlined in Outlook.'} Zoom: {zoom.toFixed(1)}
+      </p>
+      {LAYER_DEFS.filter((d) => (mode === 'sites' ? SITES_KEYS : OUTLOOK_KEYS).includes(d.key)).map((d) => (
         <div key={d.key} className="row between" style={{ padding: '2px 0' }}>
           <Check
             label={
@@ -50,18 +53,14 @@ export function LayersPanel() {
           {live.loading[d.key] && <span className="muted">…</span>}
         </div>
       ))}
-      <h3>
-        Loaded right now <Help text="How many pieces of equipment and buildings are loaded for the area on screen." />
-      </h3>
-      <div className="muted" style={{ fontSize: 12 }}>
-        Transformers {live.transformers.features.length.toLocaleString()} · Street-main segments {live.feeders.features.length.toLocaleString()} · Vaults {live.structures.features.length.toLocaleString()} · Buildings{' '}
-        {live.buildings.features.length.toLocaleString()}
-      </div>
-      {meta && (
+      {mode === 'sites' && (
         <>
-          <h3>Snapshot data</h3>
+          <h3>
+            Loaded right now <Help text="How many pieces of equipment and buildings are loaded for the area on screen." />
+          </h3>
           <div className="muted" style={{ fontSize: 12 }}>
-            Grid zones, map sheets, DAC and Census snapshots generated {new Date(meta.generated).toLocaleDateString()}. Refresh with <code>npm run snapshots</code>.
+            Transformers {live.transformers.features.length.toLocaleString()} · Street-main segments {live.feeders.features.length.toLocaleString()} · Vaults {live.structures.features.length.toLocaleString()} · Buildings{' '}
+            {live.buildings.features.length.toLocaleString()}
           </div>
         </>
       )}

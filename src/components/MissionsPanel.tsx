@@ -31,7 +31,7 @@ export function MissionsPanel() {
   return (
     <div className="panel" id="tour-missions">
       <h2>
-        Missions
+        Practice missions
         <button className="btn small" onClick={resetMissions}>
           Reset progress
         </button>

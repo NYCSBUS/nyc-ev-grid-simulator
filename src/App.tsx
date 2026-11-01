@@ -1,9 +1,8 @@
-import { useStore, type Panel, type Tab } from './state/store';
+import { useEffect } from 'react';
+import { useStore, type Tab } from './state/store';
 import { useLiveData, useStaticData, useToastAutoClear } from './state/hooks';
 import { MapView } from './components/MapView';
-import { ScenarioPanel } from './components/ScenarioPanel';
-import { LayersPanel } from './components/LayersPanel';
-import { FiltersPanel } from './components/FiltersPanel';
+import { ScenarioPanel, OutlookPanel } from './components/ScenarioPanel';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MissionsPanel, useMissionTracker } from './components/MissionsPanel';
 import { SavedPanel } from './components/SavedPanel';
@@ -14,14 +13,39 @@ import { useTour } from './components/Tour';
 import { MISSIONS } from './sim/missions';
 import { Tip } from './components/ui';
 
-const RAIL: Array<{ id: Panel; icon: string; label: string }> = [
-  { id: 'scenario', icon: '⚡', label: 'Scenario: charging sites & borough-wide growth' },
-  { id: 'layers', icon: '◧', label: 'Map layers' },
-  { id: 'filters', icon: '⚲', label: 'Filters' },
-  { id: 'settings', icon: '⚙', label: 'Settings: the knobs behind the maths' },
-  { id: 'missions', icon: '◎', label: 'Missions: practice challenges' },
-  { id: 'saved', icon: '▤', label: 'Saved scenarios, share link & compare' },
+const TABS: Array<{ id: Tab; label: string; tip: string }> = [
+  { id: 'sites', label: 'Sites', tip: 'Place charging sites and see the traffic lights on nearby grid equipment' },
+  { id: 'outlook', label: 'Outlook', tip: 'Borough-wide EV growth by year: where the grid fills up first' },
+  { id: 'results', label: 'Results', tip: 'Charts, tables, costs — and side-by-side comparison' },
+  { id: 'scenarios', label: 'Scenarios', tip: 'Save, load, share and import scenarios' },
+  { id: 'settings', label: 'Settings', tip: 'The knobs behind the maths and the price assumptions' },
+  { id: 'learn', label: 'Learn', tip: 'Illustrated guide, jargon decoder and practice missions' },
 ];
+
+function LearnTab() {
+  const view = useStore((s) => s.learnView);
+  const setView = useStore((s) => s.setLearnView);
+  const done = useStore((s) => s.missionsDone);
+  return (
+    <div className="learn">
+      <div className="subtabs">
+        <button className={`tab ${view === 'guide' ? 'active' : ''}`} onClick={() => setView('guide')}>
+          Guide
+        </button>
+        <button id="tour-missions-subtab" className={`tab ${view === 'missions' ? 'active' : ''}`} onClick={() => setView('missions')}>
+          Missions · {done.length}/{MISSIONS.length}
+        </button>
+      </div>
+      {view === 'guide' ? (
+        <HelpTab />
+      ) : (
+        <div className="page-col">
+          <MissionsPanel />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   useStaticData();
@@ -32,35 +56,37 @@ export default function App() {
 
   const tab = useStore((s) => s.tab);
   const setTab = useStore((s) => s.setTab);
-  const panel = useStore((s) => s.panel);
-  const setPanel = useStore((s) => s.setPanel);
   const sidebarOpen = useStore((s) => s.sidebarOpen);
   const setSidebarOpen = useStore((s) => s.setSidebarOpen);
   const toast = useStore((s) => s.toast);
   const missionsDone = useStore((s) => s.missionsDone);
   const requestTour = useStore((s) => s.requestTour);
 
-  const tabs: Array<{ id: Tab; label: string }> = [
-    { id: 'map', label: 'Map' },
-    { id: 'analytics', label: 'Analytics' },
-    { id: 'help', label: 'Help' },
-  ];
+  const mapTab = tab === 'sites' || tab === 'outlook';
+
+  // First paint: land on the first site so the grid equipment is visible straight away (unless a share link set the view).
+  useEffect(() => {
+    const s = useStore.getState().scenario.sites[0];
+    if (!s || location.hash.includes('s=')) return;
+    const t = setTimeout(() => useStore.getState().requestFlyTo([s.lng, s.lat], 15.6), 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <div className="app">
       <header className="topbar">
         <div className="brand">
           <span className="logo">⚡</span>
-          <span>NYC EV Load Growth Simulator</span>
-          <span className="muted" style={{ fontWeight: 400 }}>
-            · Con Edison hosting capacity
-          </span>
+          <span>NYC EV Charging &amp; Grid Simulator</span>
         </div>
         <nav className="tabs">
-          {tabs.map((t) => (
-            <button key={t.id} id={`tour-tab-${t.id}`} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
-              {t.label}
-            </button>
+          {TABS.map((t) => (
+            <Tip key={t.id} text={t.tip}>
+              <button id={`tour-tab-${t.id}`} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+                {t.label}
+                {t.id === 'learn' && missionsDone.length > 0 && <span className="badge">{missionsDone.length}/{MISSIONS.length}</span>}
+              </button>
+            </Tip>
           ))}
         </nav>
         <span className="spacer" />
@@ -72,57 +98,43 @@ export default function App() {
         </Tip>
       </header>
 
-      <div className={`main ${sidebarOpen ? '' : 'collapsed'}`}>
-        <aside className="sidebar">
-          <div className="rail">
-            {RAIL.map((r) => (
-              <Tip key={r.id} text={r.label}>
-                <button
-                  id={`tour-rail-${r.id}`}
-                  className={panel === r.id && sidebarOpen ? 'active' : ''}
-                  onClick={() => {
-                    if (panel === r.id && sidebarOpen) setSidebarOpen(false);
-                    else {
-                      setPanel(r.id);
-                      if (tab !== 'map') setTab('map');
-                    }
-                  }}
-                >
-                  {r.icon}
-                  {r.id === 'missions' && missionsDone.length > 0 && <span className="badge">{missionsDone.length}/{MISSIONS.length}</span>}
+      <div className={`main ${mapTab ? '' : 'full'} ${sidebarOpen ? '' : 'collapsed'}`}>
+        {mapTab && (
+          <aside className="sidebar">
+            {sidebarOpen ? (
+              <>
+                <button className="collapse" onClick={() => setSidebarOpen(false)} title="Hide panel">
+                  «
                 </button>
-              </Tip>
-            ))}
-            <span className="grow" />
-            <Tip text={sidebarOpen ? 'Collapse panel' : 'Expand panel'}>
-              <button onClick={() => setSidebarOpen(!sidebarOpen)}>{sidebarOpen ? '«' : '»'}</button>
-            </Tip>
-          </div>
-          {sidebarOpen && (
-            <>
-              {panel === 'scenario' && <ScenarioPanel />}
-              {panel === 'layers' && <LayersPanel />}
-              {panel === 'filters' && <FiltersPanel />}
-              {panel === 'settings' && <SettingsPanel />}
-              {panel === 'missions' && <MissionsPanel />}
-              {panel === 'saved' && <SavedPanel />}
-            </>
-          )}
-        </aside>
+                {tab === 'sites' ? <ScenarioPanel /> : <OutlookPanel />}
+              </>
+            ) : (
+              <button className="collapse" onClick={() => setSidebarOpen(true)} title="Show panel">
+                »
+              </button>
+            )}
+          </aside>
+        )}
 
         {/* Map stays mounted so Mapbox keeps its state; other tabs overlay it */}
         <div style={{ position: 'relative', minHeight: 0 }}>
-          <div style={{ position: 'absolute', inset: 0, visibility: tab === 'map' ? 'visible' : 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, visibility: mapTab ? 'visible' : 'hidden' }}>
             <MapView />
           </div>
-          {tab === 'analytics' && (
-            <div style={{ position: 'absolute', inset: 0, overflow: 'auto', background: 'var(--bg)' }}>
-              <AnalyticsTab />
-            </div>
-          )}
-          {tab === 'help' && (
-            <div style={{ position: 'absolute', inset: 0, overflow: 'auto', background: 'var(--bg)' }}>
-              <HelpTab />
+          {!mapTab && (
+            <div className="page" style={{ position: 'absolute', inset: 0, overflow: 'auto', background: 'var(--bg)' }}>
+              {tab === 'results' && <AnalyticsTab />}
+              {tab === 'scenarios' && (
+                <div className="page-col">
+                  <SavedPanel />
+                </div>
+              )}
+              {tab === 'settings' && (
+                <div className="page-col">
+                  <SettingsPanel />
+                </div>
+              )}
+              {tab === 'learn' && <LearnTab />}
             </div>
           )}
         </div>

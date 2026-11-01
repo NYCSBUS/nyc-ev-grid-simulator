@@ -4,11 +4,12 @@ import type { AreaScenario, FC, Filters, LayerVisibility, Scenario, Settings, Si
 import { DEFAULT_FILTERS, DEFAULT_LAYERS, defaultScenario, uid } from './defaults';
 import { readScenarioFromUrl } from './url';
 
-export type Tab = 'map' | 'analytics' | 'help';
-export type Panel = 'scenario' | 'layers' | 'filters' | 'settings' | 'missions' | 'saved';
+export type Tab = 'sites' | 'outlook' | 'results' | 'scenarios' | 'settings' | 'learn';
+/** Compact drawer over the map for layers / filters. */
+export type Drawer = 'layers' | 'filters' | null;
 
 const LS_SAVED = 'evsim.saved.v1';
-const LS_UI = 'evsim.ui.v1';
+const LS_UI = 'evsim.ui.v2';
 const LS_ACTIVE = 'evsim.active.v1';
 const LS_MISSIONS = 'evsim.missions.v1';
 
@@ -56,7 +57,8 @@ export interface AppState {
   saved: Scenario[];
   compareId: string | null;
   tab: Tab;
-  panel: Panel;
+  drawer: Drawer;
+  learnView: 'guide' | 'missions';
   selectedSiteId: string | null;
   placing: boolean;
   tourRequested: boolean;
@@ -73,7 +75,8 @@ export interface AppState {
 
   // actions
   setTab: (t: Tab) => void;
-  setPanel: (p: Panel) => void;
+  setDrawer: (d: Drawer) => void;
+  setLearnView: (v: 'guide' | 'missions') => void;
   setSidebarOpen: (b: boolean) => void;
   setScenarioName: (n: string) => void;
   addSite: (s: Site) => void;
@@ -116,8 +119,9 @@ export const useStore = create<AppState>((set, get) => ({
   scenario: initialScenario(),
   saved: loadList<Scenario>(LS_SAVED),
   compareId: null,
-  tab: 'map',
-  panel: 'scenario',
+  tab: 'sites',
+  drawer: null,
+  learnView: 'guide',
   selectedSiteId: null,
   placing: false,
   tourRequested: false,
@@ -132,11 +136,21 @@ export const useStore = create<AppState>((set, get) => ({
   analyticsVisited: false,
   toast: null,
 
-  setTab: (tab) => set({ tab, analyticsVisited: get().analyticsVisited || tab === 'analytics' }),
-  setPanel: (panel) => set({ panel, sidebarOpen: true }),
+  setTab: (tab) =>
+    set((s) => ({
+      tab,
+      drawer: null,
+      analyticsVisited: s.analyticsVisited || tab === 'results',
+      // the Outlook tab *is* the borough-wide model, so switch it on when the user goes there
+      scenario: tab === 'outlook' && !s.scenario.area.enabled ? { ...s.scenario, area: { ...s.scenario.area, enabled: true } } : s.scenario,
+      // Outlook is a borough-scale view: zoom out if the user arrives from street level
+      flyTo: tab === 'outlook' && s.viewport.zoom > 12.5 ? { center: [-73.93, 40.78], zoom: 10.6, nonce: Date.now() } : s.flyTo,
+    })),
+  setDrawer: (drawer) => set({ drawer }),
+  setLearnView: (learnView) => set({ learnView }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
   setScenarioName: (name) => set((s) => ({ scenario: { ...s.scenario, name } })),
-  addSite: (site) => set((s) => ({ scenario: { ...s.scenario, sites: [...s.scenario.sites, site] }, selectedSiteId: site.id, placing: false, panel: 'scenario' })),
+  addSite: (site) => set((s) => ({ scenario: { ...s.scenario, sites: [...s.scenario.sites, site] }, selectedSiteId: site.id, placing: false, tab: 'sites', sidebarOpen: true })),
   updateSite: (id, patch) =>
     set((s) => ({ scenario: { ...s.scenario, sites: s.scenario.sites.map((x) => (x.id === id ? { ...x, ...patch } : x)) } })),
   removeSite: (id) =>

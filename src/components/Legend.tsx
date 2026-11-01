@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { useStore } from '../state/store';
 import { ACS_VARS } from './MapView';
-import type { Thresholds } from '../types';
+import type { LayerVisibility, Thresholds } from '../types';
+import { MIN_ZOOM } from '../config';
 
-export function Legend({ thresholds, areaActive }: { thresholds: Thresholds; areaActive: boolean }) {
-  const layers = useStore((s) => s.layers);
+export function Legend({ thresholds, areaActive, layers: raw, zoom }: { thresholds: Thresholds; areaActive: boolean; layers: LayerVisibility; zoom: number }) {
+  // only describe what is actually drawn at this zoom
+  const layers: LayerVisibility = { ...raw, transformers: raw.transformers && zoom >= MIN_ZOOM.transformers, feeders: raw.feeders && zoom >= MIN_ZOOM.feeders, buildings: raw.buildings && zoom >= MIN_ZOOM.buildings };
   const filters = useStore((s) => s.filters);
   const [open, setOpen] = useState(true);
+  const anyAsset = layers.transformers || layers.feeders || layers.msplates || layers.buildings || layers.dac || layers.networks;
+  if (!anyAsset && !areaActive && !layers.sites) return null;
   if (!open)
     return (
       <div className="map-overlay legend" style={{ padding: 6 }}>

@@ -6,9 +6,9 @@ A map-based, static (GitHub Pages) simulator for testing where new EV charging l
 
 - **Map** (Mapbox GL) of the Con Edison territory with live layers from Con Edison's public hosting-capacity ArcGIS services: EV transformers (summer/winter), EV feeders, 33 kV feeders, network structures, M&S plates, networks (LSRV), NWS networks, disadvantaged communities; NYC **MapPLUTO** attributes joined to **Building Footprints**; **Census tracts** with ACS demographics.
 - **Site simulation**: search an address (or click the map / shift-click a building), set charger mix (L2 7–19 kW, DCFC 50–350 kW), use profile, utilization, diversity, managed charging and storage. Nearby transformers, feeders, M&S plates, structures and the network get a green / amber / red status against published headroom.
-- **Area-wide adoption**: EV fleet share by year (2024–2045) on policy / moderate / slow / custom curves, converted to coincident peak kW per tract and aggregated to networks.
-- **Analytics tab**: hourly load, asset loading, cost & incentive breakdown, adoption curves, network stress table, scenario comparison, CSV/PNG export.
-- **Missions**, a **guided tour**, hover **tooltips** on every control, and an illustrated **Help** tab.
+- **Outlook tab** (borough-wide adoption): EV fleet share by year (2024–2045) on policy / moderate / slow / custom curves, converted to coincident peak kW per tract and aggregated to networks.
+- **Results tab**: hourly load, asset loading, cost & incentive breakdown, adoption curves, network stress table, scenario comparison, CSV/PNG export.
+- **Missions**, a **guided tour**, hover **tooltips** on every control, and an illustrated guide + jargon decoder in the **Learn** tab.
 - Scenarios persist in the browser and can be shared as a URL.
 
 ## Run locally
@@ -29,7 +29,7 @@ npm run snapshots            # only fetches files that are missing
 node scripts/fetch-snapshots.mjs --force   # refresh everything
 ```
 
-The Layers panel shows the snapshot date.
+The Settings tab shows the snapshot date.
 
 ## Deploy to GitHub Pages
 

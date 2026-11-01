@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from 'react';
 import { useStore } from '../state/store';
 import { useAssessments, useAreaResult } from '../state/hooks';
 import { CHARGERS, CURVE_LABELS, PROFILES, evShare } from '../sim/profiles';
@@ -23,23 +24,16 @@ export function ScenarioPanel() {
   return (
     <div className="panel" id="tour-scenario">
       <h2>
-        <input
-          type="text"
-          value={scenario.name}
-          onChange={(e) => setScenarioName(e.target.value)}
-          style={{ background: 'transparent', border: 0, fontWeight: 600, fontSize: 15, width: '100%', outline: 'none' }}
-          title="Scenario name"
-        />
+        Charging sites ({scenario.sites.length}){' '}
+        <Help text="A site is one charging project at one address. The simulator works out what it draws at the grid's 5 PM rush hour, sends that load to the nearest grid equipment (transformers, street mains, vaults, grid zone) and checks how much room each has left." />
       </h2>
-
-      <h3>
-        Charging sites ({scenario.sites.length}) <Help text="A site is one charging project at one address. The simulator works out what it draws at the grid's 5 PM rush hour, sends that load to the nearest grid equipment (transformers, street mains, vaults, grid zone) and checks how much room each has left." />
-      </h3>
-      <div className="row" style={{ marginBottom: 8 }}>
+      <div className="row" style={{ marginBottom: 10 }}>
         <button id="tour-add-site" className={`btn primary ${placing ? 'active' : ''}`} onClick={() => setPlacing(!placing)}>
-          {placing ? 'Cancel placing' : '+ Add site on map'}
+          {placing ? 'Cancel' : '+ Add a site'}
         </button>
-        <span className="muted">or search an address above, or shift-click a building</span>
+        <span className="muted" style={{ fontSize: 12 }}>
+          then click the map — or search an address above
+        </span>
       </div>
       {scenario.sites.map((s) => {
         const a = assessments.get(s.id);
@@ -89,8 +83,24 @@ export function ScenarioPanel() {
       {!scenario.sites.length && <div className="empty">No charging sites yet. Search an address above or click “Add site on map”.</div>}
 
       {selected && <SiteEditor site={selected} />}
+      {!selected && scenario.sites.length > 0 && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Click a site above to edit it and see its traffic lights.</div>}
 
-      <AreaEditor />
+      <div className="row between" style={{ marginTop: 18, fontSize: 12 }}>
+        <span className="muted">Scenario name</span>
+        <input type="text" value={scenario.name} onChange={(e) => setScenarioName(e.target.value)} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', width: 180 }} title="Scenario name" />
+      </div>
+    </div>
+  );
+}
+
+function Fold({ title, children, defaultOpen = false }: { title: string; children: ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="fold">
+      <button className="fold-head" onClick={() => setOpen(!open)}>
+        <span>{open ? '▾' : '▸'}</span> {title}
+      </button>
+      {open && <div className="fold-body">{children}</div>}
     </div>
   );
 }
@@ -105,12 +115,11 @@ function SiteEditor({ site }: { site: Site }) {
 
   return (
     <div className="section" id="tour-site-editor">
-      <h3 style={{ marginTop: 0 }}>Edit site</h3>
       <div className="field">
         <input type="text" className="wide" value={site.name} onChange={(e) => set({ name: e.target.value })} placeholder="Site name" />
       </div>
 
-      <h3 id="tour-chargers">
+      <h3 id="tour-chargers" style={{ marginTop: 6 }}>
         Chargers <Help text="How many plugs of each kind. Level 2 = overnight-speed (like a dryer outlet); DC fast = 20-minute charging. Adding them up gives the sticker rating (nameplate). Fast chargers need the higher-voltage 460 V type of transformer, so the simulator looks for one of those first." />
       </h3>
       <div className="charger-grid">
@@ -132,7 +141,6 @@ function SiteEditor({ site }: { site: Site }) {
         <b>{fmt.kw(nameplateKw(site))}</b>
       </div>
 
-      <h3 id="tour-loadshape">When and how hard it charges</h3>
       <Select
         label="What kind of place"
         value={site.profile}
@@ -140,56 +148,27 @@ function SiteEditor({ site }: { site: Site }) {
         onChange={(profile) => set({ profile })}
         help={PROFILES[site.profile].desc}
       />
-      <Slider
-        label="Plugs in use at busiest hour"
-        value={site.utilization}
-        min={0.1}
-        max={1}
-        step={0.05}
-        format={(v) => fmt.pct(v)}
-        onChange={(utilization) => set({ utilization })}
-        help="How many of the plugs have a car attached at the busiest moment (engineers: utilization). Public fast-charging stations rarely top 60–80 %; a truck depot at night can hit 100 %."
-      />
-      <Slider
-        label="Charging taper"
-        value={site.diversity}
-        min={0.3}
-        max={1}
-        step={0.05}
-        format={(v) => fmt.pct(v)}
-        onChange={(diversity) => set({ diversity })}
-        help="Like a phone, a car charges slowly once it is nearly full, so an occupied plug rarely draws its maximum (engineers: diversity). 100 % = every plug at full blast."
-      />
+
+      <h3 id="tour-loadshape">Ways to soften the load</h3>
       <Check
         label="Smart (managed) charging"
         checked={site.managed}
         onChange={(managed) => set({ managed })}
         help="Like running the dishwasher after 10 PM: charging is delayed or slowed to avoid the grid's 5–6 PM rush (Con Edison runs programs like SmartCharge for this). Same chargers, different timing."
       />
-      <Slider label="On-site battery · power" value={site.storageKw} min={0} max={2000} step={50} format={(v) => fmt.kw(v)} onChange={(storageKw) => set({ storageKw })} help="A battery is a water tank for electricity: it fills overnight and tops up the station at rush hour. Power (kW) = how fast it can pour." />
-      <Slider
-        label="On-site battery · size"
-        value={site.storageKwh}
-        min={0}
-        max={8000}
-        step={100}
-        format={(v) => `${v} kWh`}
-        onChange={(storageKwh) => set({ storageKwh })}
-        help="How much the tank holds (kWh). The peak it can trim is limited by both how fast it pours and how much it holds."
-      />
-
-      <h3>How it connects to the grid</h3>
-      <Slider label="How far to look for grid equipment" value={site.radiusM} min={50} max={800} step={25} format={fmt.m} onChange={(radiusM) => set({ radiusM })} help="Only transformers, street mains and vaults inside this circle are checked. In dense 'web' areas like Manhattan the load can travel further, so a wider circle is reasonable." />
-      <Select
-        label="How the load spreads"
-        value={site.sharing}
-        options={[
-          { value: 'grid', label: 'Web: 60 / 25 / 15 % over nearest 3 taps' },
-          { value: 'single', label: 'Single pipe: 100 % on nearest tap' },
-        ]}
-        onChange={(sharing) => set({ sharing })}
-        help="In dense parts of the city the grid is a web (Con Edison: secondary network): several transformers feed one shared underground grid, so new load spreads across neighbours. In the outer boroughs a building usually hangs off a single transformer, like a cul-de-sac with one road in."
-      />
+      <Slider label="On-site battery · power" value={site.storageKw} min={0} max={2000} step={50} format={(v) => fmt.kw(v)} onChange={(storageKw) => set({ storageKw, storageKwh: site.storageKwh || (storageKw ? storageKw * 4 : 0) })} help="A battery is a water tank for electricity: it fills overnight and tops up the station at rush hour. Power (kW) = how fast it can pour." />
+      {site.storageKw > 0 && (
+        <Slider
+          label="On-site battery · size"
+          value={site.storageKwh}
+          min={0}
+          max={8000}
+          step={100}
+          format={(v) => `${v} kWh`}
+          onChange={(storageKwh) => set({ storageKwh })}
+          help="How much the tank holds (kWh). The peak it can trim is limited by both how fast it pours and how much it holds."
+        />
+      )}
 
       <h3 id="tour-impact">
         Traffic lights at the 5 PM rush{' '}
@@ -236,6 +215,69 @@ function SiteEditor({ site }: { site: Site }) {
           )}
         </>
       )}
+
+      <Fold title="More options (how busy, taper, grid connection)">
+        <Slider
+          label="Plugs in use at busiest hour"
+          value={site.utilization}
+          min={0.1}
+          max={1}
+          step={0.05}
+          format={(v) => fmt.pct(v)}
+          onChange={(utilization) => set({ utilization })}
+          help="How many of the plugs have a car attached at the busiest moment (engineers: utilization). Public fast-charging stations rarely top 60–80 %; a truck depot at night can hit 100 %."
+        />
+        <Slider
+          label="Charging taper"
+          value={site.diversity}
+          min={0.3}
+          max={1}
+          step={0.05}
+          format={(v) => fmt.pct(v)}
+          onChange={(diversity) => set({ diversity })}
+          help="Like a phone, a car charges slowly once it is nearly full, so an occupied plug rarely draws its maximum (engineers: diversity). 100 % = every plug at full blast."
+        />
+        <Slider label="How far to look for grid equipment" value={site.radiusM} min={50} max={800} step={25} format={fmt.m} onChange={(radiusM) => set({ radiusM })} help="Only transformers, street mains and vaults inside this circle are checked. In dense 'web' areas like Manhattan the load can travel further, so a wider circle is reasonable." />
+        <Select
+          label="How the load spreads"
+          value={site.sharing}
+          options={[
+            { value: 'grid', label: 'Web: 60 / 25 / 15 % over nearest 3 taps' },
+            { value: 'single', label: 'Single pipe: 100 % on nearest tap' },
+          ]}
+          onChange={(sharing) => set({ sharing })}
+          help="In dense parts of the city the grid is a web (Con Edison: secondary network): several transformers feed one shared underground grid, so new load spreads across neighbours. In the outer boroughs a building usually hangs off a single transformer, like a cul-de-sac with one road in."
+        />
+      </Fold>
+    </div>
+  );
+}
+
+export function OutlookPanel() {
+  const area = useStore((s) => s.scenario.area);
+  const setArea = useStore((s) => s.setArea);
+  const setTab = useStore((s) => s.setTab);
+  return (
+    <div className="panel" id="tour-outlook">
+      <h2>
+        Borough-wide outlook{' '}
+        <Help text="Zooms out from single sites to whole neighbourhoods. Recipe: count the cars in each Census neighbourhood, assume a share go electric by the chosen year, estimate how many are plugged in at 5 PM, and add it up for each Con Edison grid zone." />
+      </h2>
+      <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+        How much extra load will everyday EV adoption put on each grid zone, and which zones fill up first? Move the year slider and watch the map.
+      </p>
+      {!area.enabled && (
+        <div className="callout" style={{ fontSize: 12 }}>
+          The outlook is switched off.{' '}
+          <button className="btn small primary" onClick={() => setArea({ enabled: true })}>
+            Turn on
+          </button>
+        </div>
+      )}
+      <AreaEditor />
+      <button className="btn" style={{ width: '100%', justifyContent: 'center', marginTop: 6 }} onClick={() => setTab('results')}>
+        See the full grid-zone table in Results →
+      </button>
     </div>
   );
 }
@@ -246,12 +288,10 @@ function AreaEditor() {
   const result = useAreaResult();
   return (
     <div className="section" id="tour-area">
-      <h3 style={{ marginTop: 0, display: 'flex', justifyContent: 'space-between' }}>
-        <span>
-          Borough-wide EV growth <Help text="Zooms out from single sites to whole neighbourhoods. Recipe: count the cars in each Census neighbourhood, assume a share go electric by the chosen year, estimate how many are plugged in at 5 PM, and add it up for each Con Edison grid zone." />
-        </span>
-        <Check label="Enable" checked={area.enabled} onChange={(enabled) => setArea({ enabled })} />
-      </h3>
+      <div className="row between" style={{ marginBottom: 4 }}>
+        <h3 style={{ margin: 0 }}>Assumptions</h3>
+        <Check label="On" checked={area.enabled} onChange={(enabled) => setArea({ enabled })} />
+      </div>
       <Slider label="Year" value={area.year} min={2024} max={2045} onChange={(year) => setArea({ year })} />
       <Select label="How fast cars go electric" value={area.curve} options={(Object.keys(CURVE_LABELS) as Array<keyof typeof CURVE_LABELS>).map((k) => ({ value: k, label: CURVE_LABELS[k] }))} onChange={(curve) => setArea({ curve })} help="Share of cars on the road that are electric in the chosen year. 'Policy' follows New York's rule that all new cars sold are zero-emission by 2035 (the cars on the road lag new sales by about a decade)." />
       {area.curve === 'custom' && <Slider label="Share of cars electric in 2035" value={area.custom2035} min={0.05} max={0.8} step={0.01} format={(v) => fmt.pct(v)} onChange={(custom2035) => setArea({ custom2035 })} />}
@@ -259,6 +299,7 @@ function AreaEditor() {
         <span>Cars that are electric in {area.year}</span>
         <b style={{ color: 'var(--accent)' }}>{fmt.pct(evShare(area.curve, area.year, area.custom2035), 1)}</b>
       </div>
+      <Fold title="Charging habits (home share, smart charging, public use)">
       <Slider label="EV drivers who can charge at home" value={area.homeShare} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(homeShare) => setArea({ homeShare })} help="Share of EV drivers who can charge at home or in their building's garage. Low where most people rent and park on the street; those drivers charge in public instead (next slider but one)." />
       <Slider label="Home charger power" value={area.evKw} min={1.4} max={19.2} step={0.1} format={(v) => `${v} kW`} onChange={(evKw) => setArea({ evKw })} />
       <Slider label="Home chargers busy at 5 PM" value={area.coincidence} min={0.05} max={0.6} step={0.01} format={(v) => fmt.pct(v)} onChange={(coincidence) => setArea({ coincidence })} help="Of all the home chargers, the share actually drawing power at the grid's 5 PM rush if nobody manages them. Utility studies find 15–30 %." />
@@ -269,13 +310,14 @@ function AreaEditor() {
         <span>Rush-hour load per EV (all effects)</span>
         <b style={{ color: 'var(--accent)' }}>{kwPerEv(area).toFixed(2)} kW</b>
       </div>
+      </Fold>
       <h3>Which boroughs</h3>
       <Chips options={BOROUGHS.map((b) => ({ value: b, label: b }))} value={area.boroughs} onChange={(boroughs) => setArea({ boroughs })} />
       <Check label="Disadvantaged communities only" checked={area.dacOnly} onChange={(dacOnly) => setArea({ dacOnly })} />
       {result && (
         <div className="section" style={{ marginTop: 10, background: 'var(--bg)' }}>
           <div className="row between">
-            <span className="muted">EVs on the road</span>
+            <span className="muted">EVs on the road in {area.year}</span>
             <b>{fmt.int(result.totalEvs)}</b>
           </div>
           <div className="row between">

@@ -242,7 +242,7 @@ export function AnalyticsTab() {
     <div className="analytics" id="tour-analytics">
       <div className="row between" style={{ marginBottom: 10 }}>
         <h2 style={{ fontSize: 18 }}>
-          Analytics · {scenario.name}
+          Results · {scenario.name}
           {compare && <span className="muted" style={{ fontSize: 13 }}> vs {compare.name}</span>}
         </h2>
         <div className="row">
@@ -362,7 +362,7 @@ export function AnalyticsTab() {
                         onClick={() => {
                           selectSite(s.id);
                           requestFlyTo([s.lng, s.lat], 16);
-                          setTab('map');
+                          setTab('sites');
                         }}
                       >
                         Map
@@ -480,7 +480,7 @@ export function AnalyticsTab() {
       ) : (
         <div className="card">
           <h3>Area-wide adoption</h3>
-          <div className="empty">Enable the area-wide EV adoption scenario in the Scenario panel to see tract- and network-level load growth here.</div>
+          <div className="empty">Open the Outlook tab to switch on borough-wide EV growth; the grid-zone charts and table will appear here.</div>
         </div>
       )}
     </div>

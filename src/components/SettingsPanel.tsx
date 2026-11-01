@@ -9,6 +9,7 @@ export function SettingsPanel() {
   const setSettings = useStore((s) => s.setSettings);
   const setCost = useStore((s) => s.setCostParams);
   const t = settings.thresholds;
+  const meta = useStore((s) => s.staticData.meta);
   return (
     <div className="panel" id="tour-settings">
       <h2>
@@ -60,6 +61,16 @@ export function SettingsPanel() {
       <Slider label="Grant covers this share of wiring" value={settings.cost.incentiveBase} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(incentiveBase) => setCost({ incentiveBase })} />
       <Slider label="… in disadvantaged communities" value={settings.cost.incentiveDac} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(incentiveDac) => setCost({ incentiveDac })} />
       <NumberField label="Grant cap per site" value={settings.cost.incentiveCap} step={100000} min={0} suffix="$" onChange={(incentiveCap) => setCost({ incentiveCap })} />
+
+      {meta && (
+        <>
+          <h3>Data</h3>
+          <div className="muted" style={{ fontSize: 12 }}>
+            Grid zones, map sheets, DAC and Census snapshots generated {new Date(meta.generated).toLocaleDateString()}. Transformers, street mains, vaults and buildings stream live. Refresh snapshots with{' '}
+            <code>npm run snapshots</code>.
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -69,7 +69,7 @@ export function SavedPanel() {
       </div>
 
       <h3>
-        Saved scenarios <Help text="Kept in this browser only. Pick one as the comparison to see it side by side with your current work in Analytics." />
+        Saved scenarios <Help text="Kept in this browser only. Pick one as the comparison to see it side by side with your current work in Results." />
       </h3>
       {!saved.length && <div className="muted">Nothing saved yet.</div>}
       {saved
@@ -87,7 +87,7 @@ export function SavedPanel() {
                   className={`btn small ${compareId === s.id ? 'active' : ''}`}
                   onClick={() => {
                     setCompare(compareId === s.id ? null : s.id);
-                    if (compareId !== s.id) setTab('analytics');
+                    if (compareId !== s.id) setTab('results');
                   }}
                 >
                   {compareId === s.id ? 'Comparing' : 'Compare'}

@@ -12,6 +12,9 @@ import { STATUS_COLOR, fmt } from './ui';
 import type { AcsVariable, FC, Site } from '../types';
 import type { Status } from '../types';
 import { Legend } from './Legend';
+import { LayersPanel } from './LayersPanel';
+import { FiltersPanel } from './FiltersPanel';
+import type { LayerVisibility } from '../types';
 
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
@@ -150,8 +153,21 @@ export function MapView() {
   const loaded = useRef(false);
   const popupRef = useRef<mapboxgl.Popup | null>(null);
 
-  const layers = useStore((s) => s.layers);
+  const rawLayers = useStore((s) => s.layers);
   const filters = useStore((s) => s.filters);
+  const tab = useStore((s) => s.tab);
+  const drawer = useStore((s) => s.drawer);
+  const setDrawer = useStore((s) => s.setDrawer);
+  const selectedSiteIdForHint = useStore((s) => s.selectedSiteId);
+  const mode: 'sites' | 'outlook' = tab === 'outlook' ? 'outlook' : 'sites';
+  // Each map mode shows only what it needs: Sites = equipment around sites; Outlook = heat map + grid zones.
+  const layers = useMemo<LayerVisibility>(
+    () =>
+      mode === 'outlook'
+        ? { ...rawLayers, transformers: false, feeders: false, structures: false, buildings: false, msplates: false, feeders33kv: false, networks: true, areaStress: true }
+        : { ...rawLayers, areaStress: false },
+    [rawLayers, mode],
+  );
   const staticData = useStore((s) => s.staticData);
   const live = useStore((s) => s.live);
   const sites = useStore((s) => s.scenario.sites);
@@ -441,7 +457,7 @@ export function MapView() {
       switch (layerId) {
         case 'sites-circle':
           st.selectSite(String(p.id));
-          st.setPanel('scenario');
+          st.setTab('sites');
           return;
         case 'transformers-circle':
           html = popupHtml(`Transformer (tap) ${p.Transformer ?? ''}`, [
@@ -630,7 +646,8 @@ export function MapView() {
     const map = mapRef.current;
     if (!ready() || !map) return;
     const vis = (ids: string[], on: boolean) => ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'));
-    vis(['networks-fill', 'networks-line', 'networks-label'], layers.networks);
+    vis(['networks-fill', 'networks-line'], layers.networks);
+    vis(['networks-label'], layers.networks && mode === 'outlook');
     vis(['msplates-fill', 'msplates-line'], layers.msplates);
     vis(['dac-fill', 'dac-line'], layers.dac);
     vis(['nws-line'], layers.nws);
@@ -640,7 +657,8 @@ export function MapView() {
     vis(['structures-circle'], layers.structures);
     vis(['buildings-fill'], layers.buildings);
     vis(['feeders33kv-line'], layers.feeders33kv);
-    vis(['sites-circle', 'sites-label', 'sites-icon', 'site-radius-fill', 'site-radius-line', 'impact-line', 'impact-point', 'impact-fill'], layers.sites);
+    vis(['sites-circle', 'sites-label', 'sites-icon'], layers.sites);
+    vis(['site-radius-fill', 'site-radius-line', 'impact-line', 'impact-point', 'impact-fill'], layers.sites && mode === 'sites');
 
     // transformer filter
     const xf: any[] = ['all'];
@@ -668,7 +686,7 @@ export function MapView() {
     if (filters.dacOnly) tf.push(['==', ['get', 'dac'], 1]);
     map.setFilter('tracts-fill', tf);
     map.setFilter('tracts-line', tf);
-  }, [layers, filters, area, styleNonce]);
+  }, [layers, filters, area, styleNonce, mode]);
 
   // ---------- choropleth / area stress ----------
   useEffect(() => {
@@ -765,10 +783,11 @@ export function MapView() {
   const zoom = viewport.zoom;
   const loadingAny = Object.values(live.loading).some(Boolean);
   const hints: string[] = [];
-  if (layers.transformers && zoom < MIN_ZOOM.transformers) hints.push(`Zoom to ${MIN_ZOOM.transformers}+ for transformers`);
-  if (layers.feeders && zoom < MIN_ZOOM.feeders) hints.push(`Zoom to ${MIN_ZOOM.feeders}+ for feeders`);
-  if (layers.buildings && zoom < MIN_ZOOM.buildings) hints.push(`Zoom to ${MIN_ZOOM.buildings}+ for buildings (MapPLUTO)`);
-  if (layers.structures && zoom < MIN_ZOOM.structures) hints.push(`Zoom to ${MIN_ZOOM.structures}+ for structures`);
+  if (mode === 'sites') {
+    const wantsEquipment = layers.transformers || layers.feeders || layers.buildings || layers.structures;
+    if (wantsEquipment && zoom < MIN_ZOOM.feeders) hints.push('Zoom in to see grid equipment (transformers at 14+, buildings at 15+) — or click ⌖ on a site');
+    else if (!selectedSiteIdForHint && sites.length) hints.push('Click a site pin or card to see its traffic lights · click any dot for details');
+  } else if (!area) hints.push('Turn the outlook on in the left panel to see the heat map');
   const errs = Object.entries(live.errors).filter(([, v]) => v);
 
   return (
@@ -787,7 +806,7 @@ export function MapView() {
         {loadingAny && <div className="note loading">Loading live Con Edison / NYC data…</div>}
         {hints.map((h) => (
           <div className="note muted" key={h}>
-            {h} (now {zoom.toFixed(1)})
+            {h}
           </div>
         ))}
         {errs.map(([k, v]) => (
@@ -797,12 +816,29 @@ export function MapView() {
         ))}
       </div>
       {placing && <div className="map-overlay placing-banner">Click anywhere on the map to put chargers there · Esc to cancel</div>}
-      <Legend thresholds={thresholds} areaActive={!!area && layers.areaStress} />
-      <div className="map-overlay" style={{ right: 52, top: 12 }}>
+      <Legend thresholds={thresholds} areaActive={!!area && layers.areaStress} layers={layers} zoom={zoom} />
+      <div className="map-overlay map-tools">
+        <button className={`btn small ${drawer === 'layers' ? 'active' : ''}`} onClick={() => setDrawer(drawer === 'layers' ? null : 'layers')} id="tour-layers-btn">
+          ◧ Layers
+        </button>
+        <button className={`btn small ${drawer === 'filters' ? 'active' : ''}`} onClick={() => setDrawer(drawer === 'filters' ? null : 'filters')} id="tour-filters-btn">
+          ⚲ Filters
+        </button>
         <button className={`btn small ${layers.satellite ? 'active' : ''}`} onClick={() => setLayers({ satellite: !layers.satellite })} title="Toggle satellite imagery">
           {layers.satellite ? 'Dark map' : 'Satellite'}
         </button>
       </div>
+      {drawer && (
+        <div className="map-overlay map-drawer" id="tour-drawer">
+          <div className="row between" style={{ padding: '8px 12px 0' }}>
+            <b>{drawer === 'layers' ? 'Map layers' : 'Filters'}</b>
+            <button className="btn small" onClick={() => setDrawer(null)}>
+              ×
+            </button>
+          </div>
+          {drawer === 'layers' ? <LayersPanel mode={mode} /> : <FiltersPanel mode={mode} />}
+        </div>
+      )}
     </div>
   );
 }

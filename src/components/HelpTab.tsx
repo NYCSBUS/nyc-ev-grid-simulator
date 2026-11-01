@@ -229,7 +229,7 @@ export function HelpTab() {
           className="btn primary"
           style={{ marginTop: 14 }}
           onClick={() => {
-            setTab('map');
+            setTab('sites');
             requestTour(true);
           }}
         >
@@ -244,19 +244,19 @@ export function HelpTab() {
         </p>
         <ol>
           <li>
-            <b>Pick a spot.</b> Search an address in the top bar, click <i>Add site on map</i>, or shift-click a building. A charging site appears with a starter set of chargers.
+            <b>Pick a spot.</b> In the <i>Sites</i> tab, search an address in the top bar, click <i>Add a site</i>, or shift-click a building. A charging site appears with a starter set of chargers.
           </li>
           <li>
-            <b>Describe the site</b> in the Scenario panel: how many chargers, what kind of place it is, whether charging is smart, whether there is a battery.
+            <b>Describe the site</b> in the left panel: how many chargers, what kind of place it is, whether charging is smart, whether there is a battery.
           </li>
           <li>
             <b>Read the traffic lights.</b> Every nearby piece of grid equipment gets a green, amber or red light.
           </li>
           <li>
-            <b>Zoom out</b> with <i>Area-wide EV adoption</i> to see how a whole borough's EV growth lands on the grid in any year to 2045.
+            <b>Zoom out</b> in the <i>Outlook</i> tab to see how a whole borough's EV growth lands on the grid in any year to 2045.
           </li>
           <li>
-            <b>Open Analytics</b> for charts, tables and costs; save versions, compare them, and export to CSV or PNG.
+            <b>Open Results</b> for charts, tables and costs. <i>Scenarios</i> saves, shares and compares versions.
           </li>
         </ol>
         <div className="callout">

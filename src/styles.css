@@ -196,50 +196,40 @@ h4 {
   min-height: 0;
 }
 .main.collapsed {
-  grid-template-columns: 56px 1fr;
+  grid-template-columns: 28px 1fr;
+}
+.main.full {
+  grid-template-columns: 1fr;
 }
 .sidebar {
+  position: relative;
   background: var(--panel);
   border-right: 1px solid var(--border);
   display: grid;
-  grid-template-columns: 56px 1fr;
   min-height: 0;
 }
-.main.collapsed .sidebar {
-  grid-template-columns: 56px;
-}
-.rail {
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 6px;
-}
-.rail button {
-  background: transparent;
+.sidebar .collapse {
+  position: absolute;
+  top: 6px;
+  right: 4px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
   border: 1px solid transparent;
-  border-radius: 8px;
-  width: 44px;
-  height: 44px;
-  cursor: pointer;
+  background: transparent;
   color: var(--muted);
-  display: grid;
-  place-items: center;
-  font-size: 18px;
-  position: relative;
+  cursor: pointer;
 }
-.rail button.active {
-  background: var(--panel-2);
-  color: var(--accent);
+.sidebar .collapse:hover {
+  color: var(--text);
   border-color: var(--border);
 }
-.rail button:hover {
-  color: var(--text);
-}
-.rail .badge {
-  position: absolute;
-  top: 3px;
+.main.collapsed .sidebar .collapse {
   right: 3px;
+}
+.tabs .badge {
+  margin-left: 6px;
   background: var(--ok);
   color: #042;
   border-radius: 10px;
@@ -247,13 +237,69 @@ h4 {
   padding: 0 5px;
   font-weight: 700;
 }
-.rail .grow {
-  flex: 1;
+.page-col {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 10px 16px;
+}
+.learn .subtabs {
+  display: flex;
+  gap: 2px;
+  padding: 10px 28px 0;
+}
+.fold {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.fold-head {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: 8px 0 4px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  gap: 6px;
+}
+.fold-head:hover {
+  color: var(--text);
+}
+.map-tools {
+  right: 52px;
+  top: 12px;
+  display: flex;
+  gap: 6px;
+}
+.map-tools .btn {
+  background: rgba(23, 29, 37, 0.92);
+  backdrop-filter: blur(6px);
+}
+.map-drawer {
+  right: 52px;
+  top: 46px;
+  width: 330px;
+  max-height: calc(100% - 90px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: rgba(23, 29, 37, 0.96);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+.map-drawer .panel {
+  padding: 4px 12px 14px;
 }
 .panel {
   overflow-y: auto;
   min-height: 0;
   padding: 12px 14px 40px;
+}
+.sidebar .panel {
+  padding-right: 30px;
 }
 .panel h2 {
   font-size: 15px;
@@ -542,6 +588,8 @@ h4 {
 .legend {
   right: 12px;
   bottom: 30px;
+  max-height: 55%;
+  overflow-y: auto;
   background: rgba(23, 29, 37, 0.92);
   border: 1px solid var(--border);
   border-radius: var(--radius);
