@@ -19,13 +19,13 @@ const EMPTY: FC = { type: 'FeatureCollection', features: [] };
 
 export const ACS_VARS: Record<AcsVariable, { label: string; fmt: (v: number) => string; ramp: string[]; help: string }> = {
   none: { label: 'None', fmt: String, ramp: [], help: '' },
-  density: { label: 'Population density', fmt: (v) => `${fmt.int(v)} /km²`, ramp: ['#1e293b', '#0ea5e9', '#f0abfc'], help: 'People per km² (ACS 5-yr).' },
-  mhi: { label: 'Median household income', fmt: (v) => `$${fmt.int(v)}`, ramp: ['#7f1d1d', '#f59e0b', '#22c55e'], help: 'ACS table B19013.' },
-  renter_share: { label: 'Renter share', fmt: (v) => fmt.pct(v), ramp: ['#1e293b', '#a855f7'], help: 'Renter-occupied / occupied units (B25003). Renters rarely have home charging.' },
-  veh_per_hh: { label: 'Vehicles per household', fmt: (v) => v.toFixed(2), ramp: ['#1e293b', '#fb923c'], help: 'Derived from B08201. Drives how many EVs a tract will host.' },
-  no_veh_share: { label: 'No-vehicle households', fmt: (v) => fmt.pct(v), ramp: ['#1e293b', '#38bdf8'], help: 'Share of households without a car (B08201).' },
-  mf_share: { label: 'Multifamily (5+ units) share', fmt: (v) => fmt.pct(v), ramp: ['#1e293b', '#e879f9'], help: 'Units in 5+ unit buildings / all units (B25024).' },
-  dac: { label: 'Disadvantaged community', fmt: (v) => (v ? 'DAC' : 'Not DAC'), ramp: ['#1e293b', '#f97316'], help: 'NY CLCPA Disadvantaged Community tracts (Con Edison layer).' },
+  density: { label: 'Population density', fmt: (v) => `${fmt.int(v)} /km²`, ramp: ['#1e293b', '#0ea5e9', '#f0abfc'], help: 'How crowded the neighbourhood is: people per square kilometre (Census ACS).' },
+  mhi: { label: 'Median household income', fmt: (v) => `$${fmt.int(v)}`, ramp: ['#7f1d1d', '#f59e0b', '#22c55e'], help: 'Typical household income in the neighbourhood (Census ACS).' },
+  renter_share: { label: 'Renters', fmt: (v) => fmt.pct(v), ramp: ['#1e293b', '#a855f7'], help: 'Share of homes that are rented. Renters rarely have a driveway or garage to charge in, so they depend on public or building chargers.' },
+  veh_per_hh: { label: 'Vehicles per household', fmt: (v) => v.toFixed(2), ramp: ['#1e293b', '#fb923c'], help: 'Average cars per household. More cars today means more EVs later in the borough-wide model.' },
+  no_veh_share: { label: 'Households with no car', fmt: (v) => fmt.pct(v), ramp: ['#1e293b', '#38bdf8'], help: 'Share of households that own no car at all. High in transit-rich, apartment-heavy areas — a sign that shared chargers matter more than home ones.' },
+  mf_share: { label: 'Apartment-building share', fmt: (v) => fmt.pct(v), ramp: ['#1e293b', '#e879f9'], help: 'Share of homes that are in apartment buildings of 5 or more units — where garage or curbside charging is the only option.' },
+  dac: { label: 'Disadvantaged community', fmt: (v) => (v ? 'DAC' : 'Not DAC'), ramp: ['#1e293b', '#f97316'], help: 'Neighbourhoods New York State has flagged as Disadvantaged Communities — they qualify for larger charging grants.' },
 };
 
 function quantiles(values: number[], n = 5) {
@@ -444,33 +444,33 @@ export function MapView() {
           st.setPanel('scenario');
           return;
         case 'transformers-circle':
-          html = popupHtml(`Transformer ${p.Transformer ?? ''}`, [
+          html = popupHtml(`Transformer (tap) ${p.Transformer ?? ''}`, [
             ['Voltage', `${p.Voltage} V`],
-            ['Available capacity', p.CapacityRange],
-            ['M&S plate', p.MSPlate_1],
+            ['Room left', p.CapacityRange],
+            ['Map sheet', p.MSPlate_1],
             ['Refreshed', dateStr(p.RefreshDate)],
-          ], 'EV hosting-capacity map range. The simulator uses the configured kVA estimate per range.');
+          ], 'Con Edison publishes room left as a band, not a number. Settings decides the single value used for each band.');
           break;
         case 'feeders-line':
-          html = popupHtml(`Feeder ${p.FEEDER_ID}`, [
+          html = popupHtml(`Street main (feeder) ${p.FEEDER_ID}`, [
             ['Substation', p.SUBSTATION],
             ['Voltage', `${p.VOLTAGE_KV} kV`],
-            ['EV headroom', p.EV_HEADROOM != null ? `${(+p.EV_HEADROOM).toFixed(2)} MW` : '—'],
-            ['Electrification headroom', p.ELEC_HEADROOM != null ? `${(+p.ELEC_HEADROOM).toFixed(2)} MW` : '—'],
-            ['Feeder transformer capacity', p.TOTAL_XFMR_CAPACITY != null ? `${p.TOTAL_XFMR_CAPACITY} MVA` : '—'],
+            ['Room left for EVs', p.EV_HEADROOM != null ? `${(+p.EV_HEADROOM).toFixed(2)} MW` : '—'],
+            ['Room left for all electrification', p.ELEC_HEADROOM != null ? `${(+p.ELEC_HEADROOM).toFixed(2)} MW` : '—'],
+            ['Transformers on this main', p.TOTAL_XFMR_CAPACITY != null ? `${p.TOTAL_XFMR_CAPACITY} MVA` : '—'],
             ['Substation peak', p.SUBST_PEAK != null ? `${p.SUBST_PEAK} MW` : '—'],
             ['Notes', p.NOTES !== 'NONE' ? p.NOTES : null],
             ['Updated', dateStr(p.UPDATED_DATE)],
           ]);
           break;
         case 'feeders33kv-line':
-          html = popupHtml('33 kV feeder', Object.entries(p).slice(0, 8) as any);
+          html = popupHtml('High-voltage trunk line (33 kV)', Object.entries(p).slice(0, 8) as any);
           break;
         case 'structures-circle':
-          html = popupHtml(`Structure ${p.STRUCT_NUMBER}`, [
-            ['Network', p.NETWORK_NAME],
+          html = popupHtml(`Underground vault ${p.STRUCT_NUMBER}`, [
+            ['Grid zone', p.NETWORK_NAME],
             ['Division', p.DIV_NAME],
-            ['Hosting capacity', p.KVA != null ? `${(+p.KVA).toFixed(0)} kVA` : '—'],
+            ['Room left', p.KVA != null ? `${(+p.KVA).toFixed(0)} kVA` : '—'],
             ['Updated', dateStr(p.UPDATED_DATE)],
           ]);
           break;
@@ -491,47 +491,47 @@ export function MapView() {
           ], 'Shift+click a building to add a site there.');
           break;
         case 'msplates-fill':
-          html = popupHtml(`M&S Plate ${p.MSPLATEID}`, [
+          html = popupHtml(`Underground map sheet ${p.MSPLATEID}`, [
             ['Borough', p.BORO_NAME],
-            ['Hosting capacity', p.KVA != null ? `${(+p.KVA).toFixed(0)} kVA` : '—'],
+            ['Room left', p.KVA != null ? `${(+p.KVA).toFixed(0)} kVA` : '—'],
             ['Notes', p.NOTES],
             ['Updated', dateStr(p.UPDATED_DATE)],
           ]);
           break;
         case 'networks-fill': {
           const ns = area?.networkStats.find((n) => n.network === p.NETWORK);
-          html = popupHtml(`${p.NETWORK} network`, [
+          html = popupHtml(`${p.NETWORK} grid zone`, [
             ['Borough', p.BOROUGH],
-            ['Hosting capacity range', p.CapacityRange ? `${p.CapacityRange} MW` : '—'],
-            ['LSRV status', p.LSRV_Status],
-            ['LSRV capacity', p.CapacityMW ? `${p.CapacityMW} MW` : '—'],
-            ['Subscribed', p.SubscribedMW ? `${p.SubscribedMW} MW` : '—'],
-            ['Scenario EV load', ns ? `${ns.addedMw.toFixed(2)} MW (${fmt.int(ns.evs)} EVs) · ${fmt.pct(ns.ratio)} of range midpoint` : null],
-            ['Plate kVA sum', ns?.plateHeadroomMw != null ? `${ns.plateHeadroomMw.toFixed(1)} MW` : null],
+            ['Published capacity', p.CapacityRange ? `${p.CapacityRange} MW` : '—'],
+            ['Load-relief program (LSRV)', p.LSRV_Status],
+            ['Relief Con Ed is buying', p.CapacityMW ? `${p.CapacityMW} MW` : '—'],
+            ['Already committed', p.SubscribedMW ? `${p.SubscribedMW} MW` : '—'],
+            ['Your scenario adds', ns ? `${ns.addedMw.toFixed(2)} MW (${fmt.int(ns.evs)} EVs) · ${fmt.pct(ns.ratio)} of the mid-point` : null],
+            ['Map-sheet room, total', ns?.plateHeadroomMw != null ? `${ns.plateHeadroomMw.toFixed(1)} MW` : null],
             ['Notes', p.Notes],
           ]);
           break;
         }
         case 'tracts-fill': {
           const ts = area?.tractStats.get(String(p.GEOID));
-          html = popupHtml(`Census tract ${p.name}`, [
+          html = popupHtml(`Neighbourhood (Census tract ${p.name})`, [
             ['GEOID', p.GEOID],
             ['Population', fmt.int(p.pop)],
             ['Households', fmt.int(p.hh)],
             ['Density', p.density ? `${fmt.int(p.density)} /km²` : null],
-            ['Median HH income', p.mhi ? `$${fmt.int(p.mhi)}` : null],
+            ['Typical household income', p.mhi ? `$${fmt.int(p.mhi)}` : null],
             ['Renters', fmt.pct(p.renter_share)],
-            ['Vehicles / household', p.veh_per_hh],
-            ['No-vehicle households', fmt.pct(p.no_veh_share)],
-            ['Multifamily 5+ share', fmt.pct(p.mf_share)],
+            ['Cars per household', p.veh_per_hh],
+            ['Households with no car', fmt.pct(p.no_veh_share)],
+            ['Homes in apartment buildings', fmt.pct(p.mf_share)],
             ['Disadvantaged community', p.dac ? 'Yes' : 'No'],
-            ['Scenario EVs', ts ? fmt.int(ts.evs) : null],
-            ['Scenario added peak', ts ? fmt.kw(ts.addedKw) : null],
+            ['EVs in your scenario', ts ? fmt.int(ts.evs) : null],
+            ['Extra rush-hour load', ts ? fmt.kw(ts.addedKw) : null],
           ]);
           break;
         }
         case 'dac-fill':
-          html = popupHtml('Disadvantaged community tract', [['GEOID', p.GEOID]]);
+          html = popupHtml('Disadvantaged community', [['GEOID', p.GEOID]]);
           break;
       }
       if (html) popup.setLngLat(e.lngLat).setHTML(html).addTo(map);
@@ -796,7 +796,7 @@ export function MapView() {
           </div>
         ))}
       </div>
-      {placing && <div className="map-overlay placing-banner">Click the map to place the new site · Esc to cancel</div>}
+      {placing && <div className="map-overlay placing-banner">Click anywhere on the map to put chargers there · Esc to cancel</div>}
       <Legend thresholds={thresholds} areaActive={!!area && layers.areaStress} />
       <div className="map-overlay" style={{ right: 52, top: 12 }}>
         <button className={`btn small ${layers.satellite ? 'active' : ''}`} onClick={() => setLayers({ satellite: !layers.satellite })} title="Toggle satellite imagery">

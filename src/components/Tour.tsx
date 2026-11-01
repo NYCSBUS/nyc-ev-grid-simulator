@@ -9,7 +9,7 @@ import { nameplateKw } from '../sim/model';
 import type { Scenario, SiteAssessment } from '../types';
 import { fmt } from './ui';
 
-const LS_KEY = 'evsim.tour.seen.v2';
+const LS_KEY = 'evsim.tour.seen.v3';
 const TOUR_NAME = 'Tour walkthrough';
 const HUB = 'Roosevelt Ave fast hub (tour)';
 const GARAGE = 'Mott Haven L2 garage (tour)';
@@ -50,13 +50,32 @@ const assessmentFor = (name: string) => {
 const loading = () => Object.values(S().live.loading).some(Boolean);
 const li = (s: string) => `<li>${s}</li>`;
 
+/** Plain-English name for an asset kind. */
+function friendlyName(a: { kind: string; name: string }) {
+  switch (a.kind) {
+    case 'transformer':
+      return `transformer ${a.name}`;
+    case 'feeder':
+      return `street main (${a.name})`;
+    case 'structure':
+      return `underground vault ${a.name.replace(/^Structure\s*/, '')}`;
+    case 'plate':
+      return `map sheet ${a.name.replace(/^M&S Plate\s*/, '')}`;
+    case 'network':
+      return a.name;
+    default:
+      return a.name;
+  }
+}
+
 function statusLine(a?: SiteAssessment) {
-  if (!a) return '<i>Loading grid data from Con Edison…</i>';
+  if (!a) return '<i>Loading Con Edison grid data…</i>';
   const live = a.assets.filter((x) => x.ratio != null);
-  if (!live.length) return `<i>${loading() ? 'Loading grid data from Con Edison…' : 'No assets with capacity data within the radius.'}</i>`;
+  if (!live.length) return `<i>${loading() ? 'Loading Con Edison grid data…' : 'No equipment with capacity data nearby.'}</i>`;
   const by = (k: 'ok' | 'warn' | 'crit') => live.filter((x) => x.status === k).length;
   const worst = live.slice().sort((x, y) => (y.ratio ?? 0) - (x.ratio ?? 0))[0];
-  return `Coincident load <b>${fmt.kw(a.coincidentKw)}</b> → <span style="color:#22c55e">${by('ok')} OK</span>, <span style="color:#f59e0b">${by('warn')} watch</span>, <span style="color:#ef4444">${by('crit')} critical</span>.<br/>Binding asset: <b>${worst.name}</b> at <b>${fmt.pct(Math.min(worst.ratio!, 9.99))}</b> of ${fmt.kw(worst.headroomKw)} headroom.`;
+  const over = worst.ratio! > 1;
+  return `This site adds <b>${fmt.kw(a.coincidentKw)}</b> at the 5 PM rush → <span style="color:#22c55e">${by('ok')} green</span>, <span style="color:#f59e0b">${by('warn')} amber</span>, <span style="color:#ef4444">${by('crit')} red</span>.<br/>Tightest spot: <b>${friendlyName(worst)}</b> — it has <b>${fmt.kw(worst.headroomKw)}</b> of room and this site would ${over ? 'fill it <b>' + fmt.pct(Math.min(worst.ratio!, 9.99)) + '</b> over' : 'use <b>' + fmt.pct(worst.ratio!) + '</b> of it'}.`;
 }
 
 function areaLine() {
@@ -66,8 +85,9 @@ function areaLine() {
   const idx = buildAreaIndex(sd.tracts, sd.networks, sd.plates);
   const r = runArea(st.scenario.area, sd.tracts, sd.networks, idx, st.scenario.settings);
   const top = r.networkStats.filter((n) => n.evs > 0).slice(0, 3);
-  return `<b>${fmt.int(r.totalEvs)} EVs</b> (${fmt.pct(r.evShare, 1)} of ${fmt.int(r.totalVehicles)} vehicles) add <b>${fmt.mw(r.totalAddedMw)}</b> at system peak. ${r.networkStats.filter((n) => n.status === 'crit').length} networks critical.<br/>Most stressed: <ul style="margin:4px 0 0 16px;padding:0">${top
-    .map((n) => li(`<b>${n.network}</b> — ${n.addedMw.toFixed(1)} MW vs ${n.capacityRange ?? '?'} MW range (${fmt.pct(n.ratio)})`))
+  const crit = r.networkStats.filter((n) => n.status === 'crit').length;
+  return `About <b>${fmt.int(r.totalEvs)} EVs</b> (${fmt.pct(r.evShare, 1)} of ${fmt.int(r.totalVehicles)} cars) would add <b>${fmt.mw(r.totalAddedMw)}</b> at the 5 PM rush. <b>${crit}</b> grid zone${crit === 1 ? '' : 's'} would be over the line.<br/>Most stretched: <ul style="margin:4px 0 0 16px;padding:0">${top
+    .map((n) => li(`<b>${n.network}</b> — adds ${n.addedMw.toFixed(1)} MW to a zone rated ${n.capacityRange ?? '?'} MW (${fmt.pct(n.ratio)} of its mid-point)`))
     .join('')}</ul>`;
 }
 
@@ -80,7 +100,7 @@ function kpiLine() {
   const cost = sites.reduce((s, x) => s + (as.get(x.id)?.cost.total ?? 0), 0);
   const inc = sites.reduce((s, x) => s + (as.get(x.id)?.cost.incentive ?? 0), 0);
   const crit = sites.flatMap((x) => as.get(x.id)?.assets ?? []).filter((a) => a.status === 'crit').length;
-  return `${sites.length} sites · <b>${fmt.kw(np)}</b> nameplate · <b>${fmt.kw(co)}</b> coincident · ${crit} critical assets · est. <b>${fmt.usd(cost)}</b>, incentive ${fmt.usd(inc)} (${fmt.pct(cost ? inc / cost : 0)}).`;
+  return `${sites.length} sites · sticker rating <b>${fmt.kw(np)}</b> · actual rush-hour load <b>${fmt.kw(co)}</b> · ${crit} piece${crit === 1 ? '' : 's'} of equipment in the red · est. cost <b>${fmt.usd(cost)}</b>, of which grants cover ${fmt.usd(inc)} (${fmt.pct(cost ? inc / cost : 0)}).`;
 }
 
 /* ---------- the script ---------- */
@@ -126,9 +146,9 @@ function buildSteps(): Step[] {
 
   return [
     {
-      title: 'How an EV analyst uses this tool',
+      title: 'Welcome — a 5-minute guided tour',
       description:
-        'This walkthrough drives the app for you to answer five questions the EV Strategy group gets asked. Your current scenario has been set aside and will be restored at the end; the walkthrough is kept under Saved as “Tour walkthrough”. Use <b>Next</b> to advance — each step changes something on screen.',
+        'Think of the power grid as plumbing. Big pipes (<b>feeders</b>) run under the street; a smaller tap (<b>transformer</b>) serves each block or building. Every pipe has only so much <b>room left</b> before it is full. An EV analyst’s job is to work out where new chargers can plug in without overfilling a pipe.<br/><br/>This tour drives the app for you and answers five questions that come up every week. Your own work is set aside and comes back at the end. Press <b>Next</b> — each step changes something on screen.',
       setup: () => {
         st().setTab('map');
         st().setPanel('scenario');
@@ -139,16 +159,16 @@ function buildSteps(): Step[] {
     /* ---------- Q1 ---------- */
     {
       element: '#tour-search',
-      title: 'Q1 · “Can the grid take a 1.2 MW fast hub at Roosevelt Ave & 82nd St?”',
+      title: 'Question 1 · “Can we plug a big fast-charging station in at Roosevelt Ave & 82nd St?”',
       description:
-        'A developer wants 8 × 150 kW DC fast ports in Jackson Heights. Normally you would type the address here and click <i>Add site here</i>. The tour will place it for you on the next step.',
+        'A developer wants 8 fast chargers in Jackson Heights — enough to charge a car in 20 minutes each. Normally you would type the address here and click <i>Put chargers here</i>. The tour will place it for you on the next step.',
       side: 'bottom',
     },
     {
       element: '#tour-map',
-      title: 'The site is placed',
+      title: 'The station is on the map',
       description:
-        'White pin = the hub; dashed circle = its 250 m search radius. Coloured dots are Con Edison EV transformers (green → red = more → less available capacity; white ring = 460 V). The rings around three dots show which transformers receive this site’s load, coloured by status.',
+        'The white pin is the station. The dashed circle is how far we look for nearby grid equipment (250 m). The coloured dots are Con Edison’s <b>transformers</b> — the “taps” — coloured like a fuel gauge: green = lots of room, red = nearly full. A white ring means the tap is the higher-voltage type (460 V) that fast chargers need. The three dots with rings are the ones this station would draw from.',
       setup: () => {
         addHub();
         selectAndFly(HUB, 16.2);
@@ -158,12 +178,13 @@ function buildSteps(): Step[] {
     },
     {
       element: '#tour-chargers',
-      title: 'Sizing the load',
-      description: 'Nameplate is what the developer quotes; the utility cares about load at the 5 PM system peak. Public-hub profile × 70 % utilization × 90 % diversity gives the coincident load used for every status below.',
+      title: 'Sticker rating vs. real load',
+      description:
+        'Adding up the chargers gives the <b>sticker rating</b> (engineers say <i>nameplate</i>) — like a car’s top speed. What the grid actually feels is the load at <b>5 PM on a hot day</b>, when everyone’s air conditioning is on — the grid’s “rush hour”. Not every charger is busy at once, and cars slow their charging as they fill up, so the real rush-hour load is lower.',
       dyn: () => {
         const s = siteByName(HUB);
         const a = assessmentFor(HUB);
-        return s ? `Nameplate <b>${fmt.kw(nameplateKw(s))}</b> → peak <b>${a ? fmt.kw(a.peakKw) : '…'}</b>, at system peak <b>${a ? fmt.kw(a.coincidentKw) : '…'}</b>.` : '';
+        return s ? `Sticker rating <b>${fmt.kw(nameplateKw(s))}</b> → busiest moment <b>${a ? fmt.kw(a.peakKw) : '…'}</b> → load at the 5 PM rush <b>${a ? fmt.kw(a.coincidentKw) : '…'}</b>.` : '';
       },
       side: 'right',
     },
@@ -171,34 +192,34 @@ function buildSteps(): Step[] {
       element: '#tour-impact',
       title: 'Answer 1: not as designed',
       description:
-        'The load is split 60 / 25 / 15 % over the three nearest transformers and the three nearest vault structures. The transformers are 208 V units with < 500 kVA available and the vaults have only a few dozen kW of published headroom, so most go <b>critical</b> — the binding asset below is the one with the least room. No feeders appear because this is a secondary-network area; Con Edison publishes M&S plate and structure kVA here instead, and the plate itself has room. The constraint is local: this parcel needs a dedicated 460 V service.',
+        'The traffic lights below compare this station’s rush-hour load with the <b>room left</b> on each piece of nearby equipment. Here the nearby taps are the smaller 208 V kind with little room, and the underground <b>vaults</b> (the rooms under manhole covers where cables join) have only a few dozen kW spare — so most go <b>red</b>. No street mains are listed because in this part of Queens the grid is a <b>web</b> rather than a single pipe (more on that later). Bottom line: this exact corner would need Con Edison to install new equipment.',
       dyn: () => statusLine(assessmentFor(HUB)),
       side: 'right',
     },
     /* ---------- Q2 ---------- */
     {
       element: '#tour-loadshape',
-      title: 'Q2 · “Would managed charging fix it?”',
+      title: 'Question 2 · “Would smart charging fix it?”',
       description:
-        'Managed charging is now <b>on</b>. For a public hub it barely helps — drivers charge when they arrive, and the profile already peaks mid-afternoon to early evening. Compare the coincident load with the previous step.',
+        '<b>Smart (managed) charging</b> is like running the dishwasher after 10 PM: shift the energy use away from rush hour. The tour has just switched it <b>on</b>. For a public fast-charging station it barely helps — drivers charge when they show up, and that is mostly afternoon and evening. Compare the numbers with the previous step.',
       setup: () => patchSite(HUB, { managed: true }),
       dyn: () => statusLine(assessmentFor(HUB)),
       side: 'right',
     },
     {
       element: '#tour-loadshape',
-      title: 'Add on-site storage',
+      title: 'Add a battery on site',
       description:
-        'A 400 kW / 1.6 MWh battery now peak-shaves the site. Coincident load falls, but 208 V transformers still can’t host a fast hub. Answer 2: storage and managed charging are tools for <i>watch</i> sites, not for a fundamental voltage mismatch. The next question is where 460 V capacity exists.',
+        'A battery works like a water tank: it fills up quietly overnight and tops up the station at rush hour, so less is drawn from the grid. The tour just added a 400 kW / 1,600 kWh battery. The load drops, but the small taps still can’t carry a fast-charging station. <b>Answer 2:</b> smart charging and batteries are great for sites that are <i>amber</i>; they can’t fix a site that is deep in the red. The next question is where the right-sized taps are.',
       setup: () => patchSite(HUB, { storageKw: 400, storageKwh: 1600 }),
       dyn: () => statusLine(assessmentFor(HUB)),
       side: 'right',
     },
     {
       element: '#tour-rail-filters',
-      title: 'Hunt for 460 V capacity',
+      title: 'Hunt for the right taps nearby',
       description:
-        'Filters are now set to <b>460 V</b> transformers with <b>≥ 500 kVA</b> available, and the map zoomed out a notch. Every remaining dot is a plausible plug-in point for a DC fast hub. Where they cluster, a developer can site; where there are none, the answer is a new vault or a different corridor.',
+        'The <b>Filters</b> panel is now showing only the taps fast chargers need: <b>460 V</b> with at least <b>500 kVA</b> of room. The map zoomed out a notch. Every dot you still see is a plausible place for a fast-charging station. Where dots cluster, a developer can build; where there are none, Con Edison would need to add equipment first.',
       setup: () => {
         st().setPanel('filters');
         st().setFilters({ xfmrVoltage: ['460'], xfmrBuckets: ['500 kVA to 1000 kVA', '> 1000 kVA'] });
@@ -211,15 +232,15 @@ function buildSteps(): Step[] {
       element: '#tour-map',
       title: 'Reading the result',
       description:
-        'White-ringed dots = 460 V ≥ 500 kVA. Click any for its exact range and plate. In a real screening you would drag the site onto the best candidate, or widen the search radius in the site editor, and re-check the impact list.',
+        'White-ringed dots are the good candidates. Click any dot to see exactly how much room it has. In real life you would drag the station pin onto the best candidate, or widen the search circle in the site editor, and watch the traffic lights change.',
       side: 'left',
     },
     /* ---------- Q3 ---------- */
     {
       element: '#tour-rail-filters',
-      title: 'Q3 · “Where should an equity L2 program go?”',
+      title: 'Question 3 · “Where should a fairness-focused home-charging program go?”',
       description:
-        'Filters reset. Census tracts are now coloured by <b>households without a vehicle</b>, with <b>Disadvantaged Community</b> tracts outlined in orange. The South Bronx combines DAC status, low car ownership today and dense multifamily housing: residents can’t charge at home, so shared L2 is the program lever — and DAC siting earns the higher make-ready incentive.',
+        'Filters are reset. The map now shades every neighbourhood by <b>how many households have no car</b>, and outlines in orange the areas New York State has flagged as <b>Disadvantaged Communities</b> (DACs) — places that get the larger grants. The South Bronx stands out: lots of apartment buildings, few cars today, no driveways to charge in. Shared slower chargers in apartment garages (<b>Level 2</b>) are the fix, and DAC siting unlocks the bigger grant.',
       setup: () => {
         st().resetFilters();
         st().setFilters({ acsVariable: 'no_veh_share' });
@@ -231,8 +252,9 @@ function buildSteps(): Step[] {
     },
     {
       element: '#tour-map',
-      title: 'Place a multifamily garage site',
-      description: 'A 20-port 7.2 kW L2 garage (144 kW) is now placed in Mott Haven with the residential profile. Note the <b>DAC</b> badge on its card.',
+      title: 'Place an apartment-garage site',
+      description:
+        'The tour placed 20 overnight chargers (7.2 kW each — like a clothes-dryer outlet) in a Mott Haven garage. Note the orange <b>DAC</b> badge on its card: it sits inside a Disadvantaged Community.',
       setup: () => {
         addGarage();
         selectAndFly(GARAGE, 16);
@@ -242,17 +264,18 @@ function buildSteps(): Step[] {
     },
     {
       element: '#tour-impact',
-      title: 'Answer 3: fits, and qualifies for DAC incentives',
-      description: 'L2 loads are small; the nearest 208 V transformers absorb it with headroom to spare. In the cost module this site gets the 90 % DAC make-ready share rather than 50 %.',
+      title: 'Answer 3: it fits, and it qualifies for the bigger grant',
+      description:
+        'Overnight chargers are small loads, so the nearby taps swallow it with room to spare — all green. Because the site is in a DAC, the cost section later uses the <b>90 %</b> grant rate for the wiring work instead of 50 %.',
       dyn: () => statusLine(assessmentFor(GARAGE)),
       side: 'right',
     },
     /* ---------- Q4 ---------- */
     {
       element: '#tour-area',
-      title: 'Q4 · “How much EV load will the Bronx add by 2035, and which networks hit limits first?”',
+      title: 'Question 4 · “How much extra load will the Bronx add by 2035, and where does it bite first?”',
       description:
-        'The area scenario is now <b>on</b>: year 2035, <b>Policy</b> curve (NY Advanced Clean Cars II), scope = Bronx. Per tract: EVs = ACS vehicles × fleet share; peak kW = home-charging share × 7.2 kW × 22 % coincidence, minus managed-charging savings, plus 0.15 kW public/fleet per EV.',
+        'Now zoom out from single sites to a whole borough. The <b>Area-wide</b> model is switched <b>on</b>: year 2035, the <b>Policy</b> adoption path (New York’s rule that all new cars sold are electric by 2035), Bronx only. The recipe is simple: count the cars in each neighbourhood (Census), assume a share go electric, work out how many are plugged in at 5 PM, and add it up for each Con Edison <b>grid zone</b> (a “network”).',
       setup: () => {
         st().setArea({ enabled: true, year: 2035, curve: 'policy', boroughs: ['Bronx'], dacOnly: false });
         st().setFilters({ acsVariable: 'none' });
@@ -266,37 +289,40 @@ function buildSteps(): Step[] {
     },
     {
       element: '#tour-map',
-      title: 'Reading the overlay',
-      description: 'Tracts shade by added EV kW per km² (quintiles). Network outlines turn amber/red where the scenario’s MW approaches or exceeds Con Edison’s published network capacity range. Click a network for its numbers.',
+      title: 'Reading the heat map',
+      description:
+        'Neighbourhoods are shaded by how much new EV load lands per square kilometre (blue = little, red = a lot). The outlined grid zones turn amber or red when the added load approaches or passes the capacity Con Edison publishes for that zone. Click a zone to see its numbers.',
       side: 'left',
     },
     {
       element: '#tour-networktable',
-      title: 'Answer 4: the reinforcement queue',
+      title: 'Answer 4: the to-do list for the grid planners',
       description:
-        'Analytics ranks every network by added MW ÷ capacity-range midpoint. Red rows are where Distribution Planning needs reinforcement or a non-wires solution first; the <b>DAC share</b> column shows how much of that growth is in disadvantaged communities. Export CSV to drop straight into Excel.',
+        'The Analytics tab ranks every grid zone by how full the new load would make it. Red rows are where Con Edison’s planners need to add equipment (or pay customers to shift load) first. The <b>DAC share</b> column shows how much of that growth is in disadvantaged neighbourhoods. The <b>CSV</b> button drops the table straight into Excel.',
       setup: () => st().setTab('analytics'),
       dyn: areaLine,
       side: 'top',
     },
     {
       element: '#tour-hourly',
-      title: 'Load shape for the deck',
-      description: 'The hourly chart stacks both sites. The dashed red line is the same portfolio without managed charging or storage — a one-glance way to show the value of load management. The blue marker is the system-peak hour used for every status.',
+      title: 'The day-long picture',
+      description:
+        'This chart shows both sites’ load hour by hour, stacked. The dashed red line is what the same sites would draw <i>without</i> smart charging or batteries — a one-glance way to show their value. The blue marker is 5 PM, the rush hour every traffic light is judged on.',
       side: 'bottom',
     },
     /* ---------- Q5 ---------- */
     {
       element: '#tour-cost',
-      title: 'Q5 · “What does this cost, and what does the incentive cover?”',
+      title: 'Question 5 · “What does this cost, and how much do grants cover?”',
       description:
-        'Chargers + make-ready ($/kW) + storage + grid-upgrade allowances triggered by critical assets. The Roosevelt hub carries transformer-upgrade allowances; the Mott Haven garage does not, and earns the higher DAC incentive share. Every number is editable in Settings and saved with the scenario.',
+        'Cost = the chargers themselves + the wiring from the street to the parking spot (called <b>make-ready</b>, like plumbing before you buy the faucet) + any battery + an allowance for grid equipment Con Edison would have to add where a light is red. The Roosevelt Ave station carries those upgrade costs; the Mott Haven garage does not, and gets the higher DAC grant rate. All the price assumptions can be changed in Settings.',
       side: 'top',
     },
     {
       element: '#tour-kpis',
-      title: 'Headline KPIs',
-      description: 'The numbers a program manager asks for: nameplate, coincident peak, critical assets, cost, incentive, DAC share. Pick a saved scenario in the dropdown above to show them side by side.',
+      title: 'The headline numbers',
+      description:
+        'These are the figures a program manager asks for: total sticker rating, real rush-hour load, how many pieces of equipment go red, total cost, grant coverage, and how many sites are in disadvantaged communities. Use the dropdown above to show a saved scenario side by side.',
       dyn: kpiLine,
       side: 'bottom',
     },
@@ -304,7 +330,8 @@ function buildSteps(): Step[] {
     {
       element: '#tour-rail-saved',
       title: 'Save, share, compare',
-      description: 'The whole scenario — sites, area settings, model assumptions — is encoded in a share link. Save variants (e.g. “with managed charging”) and compare them in Analytics.',
+      description:
+        'Everything you set up — sites, borough-wide settings, price assumptions — fits in one share link. Save a few variations (for example “with smart charging” vs. “without”) and compare them in Analytics.',
       setup: () => {
         st().setTab('map');
         st().setPanel('saved');
@@ -314,7 +341,8 @@ function buildSteps(): Step[] {
     {
       element: '#tour-rail-missions',
       title: 'Keep practising',
-      description: 'Missions pose more questions like these and check your answers. Hover any (?) for a definition; the Help tab explains hosting capacity, coincidence, diversity and the area model with diagrams. Finishing now restores your previous scenario.',
+      description:
+        '<b>Missions</b> pose more questions like these and check your answers automatically. Hover any <b>(?)</b> for a plain-English explanation; the <b>Help</b> tab has pictures of how the grid fits together. Finishing now brings your own scenario back.',
       setup: () => st().setPanel('missions'),
       side: 'right',
     },
@@ -374,7 +402,7 @@ function runTour(onDone: () => void): { cancel: () => void } {
     popoverClass: 'tour-popover',
     nextBtnText: 'Next →',
     prevBtnText: '← Back',
-    doneBtnText: 'Finish & restore my scenario',
+    doneBtnText: 'Finish & bring my work back',
     progressText: 'Step {{current}} of {{total}}',
     steps: driveSteps,
     onDestroyed: () => {
@@ -389,7 +417,7 @@ function runTour(onDone: () => void): { cancel: () => void } {
       st.setFilters(prevFilters);
       st.setTab('map');
       st.setPanel('scenario');
-      st.setToast('Tour finished — your scenario is restored; the walkthrough is in Saved');
+      st.setToast('Tour finished — your scenario is back; the walkthrough is kept under Saved');
       onDone();
     },
   });

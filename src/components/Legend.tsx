@@ -26,21 +26,21 @@ export function Legend({ thresholds, areaActive }: { thresholds: Thresholds; are
       {layers.sites && (
         <>
           <div className="item">
-            <span className="sw dot" style={{ background: '#22c55e' }} /> Site OK (&lt; {Math.round(thresholds.warn * 100)}% of headroom)
+            <span className="sw dot" style={{ background: '#22c55e' }} /> Green: uses &lt; {Math.round(thresholds.warn * 100)}% of room left
           </div>
           <div className="item">
-            <span className="sw dot" style={{ background: '#f59e0b' }} /> Watch ({Math.round(thresholds.warn * 100)}–{Math.round(thresholds.crit * 100)}%)
+            <span className="sw dot" style={{ background: '#f59e0b' }} /> Amber: {Math.round(thresholds.warn * 100)}–{Math.round(thresholds.crit * 100)}%
           </div>
           <div className="item">
-            <span className="sw dot" style={{ background: '#ef4444' }} /> Critical (≥ {Math.round(thresholds.crit * 100)}%)
+            <span className="sw dot" style={{ background: '#ef4444' }} /> Red: ≥ {Math.round(thresholds.crit * 100)}% (over the line)
           </div>
         </>
       )}
       {layers.transformers && (
         <>
-          <h4 style={{ marginTop: 8 }}>Transformers (available capacity)</h4>
+          <h4 style={{ marginTop: 8 }}>Transformers — room left</h4>
           <div className="item">
-            <span className="sw dot" style={{ background: '#22c55e' }} /> &gt; 1000 kVA
+            <span className="sw dot" style={{ background: '#22c55e' }} /> &gt; 1000 kVA (lots)
           </div>
           <div className="item">
             <span className="sw dot" style={{ background: '#84cc16' }} /> 500–1000 kVA
@@ -49,16 +49,16 @@ export function Legend({ thresholds, areaActive }: { thresholds: Thresholds; are
             <span className="sw dot" style={{ background: '#f59e0b' }} /> 200–499 kVA
           </div>
           <div className="item">
-            <span className="sw dot" style={{ background: '#ef4444' }} /> &lt; 200 kVA
+            <span className="sw dot" style={{ background: '#ef4444' }} /> &lt; 200 kVA (nearly full)
           </div>
           <div className="item">
-            <span className="sw dot" style={{ background: '#64748b', border: '2px solid #fff' }} /> white ring = 460 V
+            <span className="sw dot" style={{ background: '#64748b', border: '2px solid #fff' }} /> white ring = 460 V (fast-charger type)
           </div>
         </>
       )}
       {layers.feeders && (
         <>
-          <h4 style={{ marginTop: 8 }}>Feeders (EV headroom)</h4>
+          <h4 style={{ marginTop: 8 }}>Street mains — room left for EVs</h4>
           <div className="item">
             <span className="sw line" style={{ background: '#22c55e' }} /> ≥ 5 MW
           </div>
@@ -75,7 +75,7 @@ export function Legend({ thresholds, areaActive }: { thresholds: Thresholds; are
       )}
       {layers.msplates && (
         <>
-          <h4 style={{ marginTop: 8 }}>M&amp;S plates (kVA)</h4>
+          <h4 style={{ marginTop: 8 }}>Underground map sheets — room left (kVA)</h4>
           <div className="ramp" style={{ background: 'linear-gradient(90deg,#ef4444,#f59e0b,#84cc16,#22c55e)' }} />
           <div className="row between muted">
             <span>0</span>
@@ -85,15 +85,15 @@ export function Legend({ thresholds, areaActive }: { thresholds: Thresholds; are
       )}
       {layers.buildings && (
         <>
-          <h4 style={{ marginTop: 8 }}>Buildings (land use)</h4>
+          <h4 style={{ marginTop: 8 }}>Buildings — what they are used for</h4>
           <div className="item">
-            <span className="sw" style={{ background: '#fde68a' }} /> 1–2 family
+            <span className="sw" style={{ background: '#fde68a' }} /> Houses (1–2 family)
           </div>
           <div className="item">
-            <span className="sw" style={{ background: '#f59e0b' }} /> Multifamily
+            <span className="sw" style={{ background: '#f59e0b' }} /> Apartment buildings
           </div>
           <div className="item">
-            <span className="sw" style={{ background: '#f87171' }} /> Commercial
+            <span className="sw" style={{ background: '#f87171' }} /> Shops & offices
           </div>
           <div className="item">
             <span className="sw" style={{ background: '#a78bfa' }} /> Industrial
@@ -110,19 +110,19 @@ export function Legend({ thresholds, areaActive }: { thresholds: Thresholds; are
       )}
       {layers.networks && (
         <div className="item">
-          <span className="sw" style={{ background: 'rgba(0,114,206,.3)', border: '1px solid #3b82f6' }} /> Con Ed network
+          <span className="sw" style={{ background: 'rgba(0,114,206,.3)', border: '1px solid #3b82f6' }} /> Con Ed grid zone
         </div>
       )}
       {areaActive && (
         <>
-          <h4 style={{ marginTop: 8 }}>Area scenario: added EV peak kW/km²</h4>
+          <h4 style={{ marginTop: 8 }}>Borough-wide growth: extra rush-hour kW per km²</h4>
           <div className="ramp" style={{ background: 'linear-gradient(90deg,#1d4ed8,#0ea5e9,#facc15,#f97316,#ef4444)' }} />
           <div className="row between muted">
             <span>low</span>
             <span>high (quintiles)</span>
           </div>
           <div className="muted" style={{ marginTop: 4 }}>
-            Network fill = status vs published capacity range
+            Grid-zone fill = traffic light vs published capacity
           </div>
         </>
       )}

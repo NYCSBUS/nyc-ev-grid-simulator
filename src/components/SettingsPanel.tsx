@@ -17,49 +17,49 @@ export function SettingsPanel() {
           Reset
         </button>
       </h2>
-      <p className="muted">These assumptions are saved with the scenario, so two scenarios can be compared on different assumptions.</p>
+      <p className="muted">The knobs behind the maths. They are saved with each scenario, so you can compare two scenarios built on different assumptions.</p>
 
-      <h3>System</h3>
+      <h3>The grid</h3>
       <Select
         label="Season"
         value={settings.season}
         options={[
-          { value: 'summer', label: 'Summer (system peak)' },
+          { value: 'summer', label: 'Summer (the grid\'s busiest season)' },
           { value: 'winter', label: 'Winter' },
         ]}
         onChange={(season) => setSettings({ season })}
-        help="Switches to Con Edison's winter transformer and feeder capacity layers. Con Edison is summer-peaking today, but electrified heat is pushing some networks toward winter peaks."
+        help="Con Edison publishes room left separately for summer and winter. Summer is the busy season today (air conditioning), but as heating goes electric some areas are becoming winter-limited."
       />
-      <Slider label="System peak hour" value={settings.peakHour} min={0} max={23} format={(v) => `${v}:00`} onChange={(peakHour) => setSettings({ peakHour })} help="Hour used to read the coincident load from each site's hourly profile. Con Edison's summer peak is typically 5–6 PM." />
-      <Slider label="Power factor" value={settings.powerFactor} min={0.8} max={1} step={0.01} format={(v) => v.toFixed(2)} onChange={(powerFactor) => setSettings({ powerFactor })} help="Converts kVA hosting capacity to kW." />
-      <Slider label="Assumed existing transformer loading" value={settings.xfmrBaseLoading} min={0} max={0.8} step={0.05} format={(v) => fmt.pct(v)} onChange={(xfmrBaseLoading) => setSettings({ xfmrBaseLoading })} help="Con Edison's ranges are already 'available' capacity, so the default is 0. Raise it for a conservative view." />
+      <Slider label="Grid rush hour" value={settings.peakHour} min={0} max={23} format={(v) => `${v}:00`} onChange={(peakHour) => setSettings({ peakHour })} help="The hour of day every traffic light is judged on. Con Edison's summer rush is 5–6 PM." />
+      <Slider label="kVA → kW conversion (power factor)" value={settings.powerFactor} min={0.8} max={1} step={0.01} format={(v) => v.toFixed(2)} onChange={(powerFactor) => setSettings({ powerFactor })} help="Con Edison states some room-left figures in kVA; chargers are rated in kW. kW = kVA × this number (0.95 is typical)." />
+      <Slider label="Assume taps are already this full" value={settings.xfmrBaseLoading} min={0} max={0.8} step={0.05} format={(v) => fmt.pct(v)} onChange={(xfmrBaseLoading) => setSettings({ xfmrBaseLoading })} help="Con Edison's transformer figures already describe room left, so the default is 0 %. Raise it to be more cautious." />
 
       <h3>
-        Status thresholds <Help text="Added load ÷ headroom. Below 'watch' is green; at or above 'critical' is red." />
+        Where the lights change colour <Help text="A light is judged by how much of the remaining room your site uses. Below the amber line = green; at or above the red line = red." />
       </h3>
-      <Slider label="Watch threshold" value={t.warn} min={0.2} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(warn) => setSettings({ thresholds: { ...t, warn } })} />
-      <Slider label="Critical threshold" value={t.crit} min={0.5} max={1.5} step={0.05} format={(v) => fmt.pct(v)} onChange={(crit) => setSettings({ thresholds: { ...t, crit } })} />
+      <Slider label="Amber from" value={t.warn} min={0.2} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(warn) => setSettings({ thresholds: { ...t, warn } })} />
+      <Slider label="Red from" value={t.crit} min={0.5} max={1.5} step={0.05} format={(v) => fmt.pct(v)} onChange={(crit) => setSettings({ thresholds: { ...t, crit } })} />
 
       <h3>
-        Transformer kVA per map range <Help text="Con Edison publishes ranges, not exact values. These point estimates are used as headroom. Adjust to be conservative (lower) or optimistic." />
+        Room per transformer size band <Help text="Con Edison publishes transformer room as a band (e.g. 500–1000 kVA), not a number. These are the single values the simulator uses for each band. Lower them to be cautious, raise them to be optimistic." />
       </h3>
       {Object.keys(settings.xfmrKvaEstimate).map((k) => (
         <NumberField key={k} label={k} value={settings.xfmrKvaEstimate[k]} step={50} min={0} suffix="kVA" onChange={(v) => setSettings({ xfmrKvaEstimate: { ...settings.xfmrKvaEstimate, [k]: v } })} />
       ))}
 
       <h3>
-        Cost & incentive assumptions <Help text="Illustrative planning numbers, editable. Make-ready incentives mirror the structure of Con Edison's PowerReady program (higher share in disadvantaged communities, capped per site)." />
+        Prices & grants <Help text="Rough planning numbers you can edit. The grant copies the shape of Con Edison's PowerReady program: a share of the wiring cost, higher in disadvantaged communities, capped per site." />
       </h3>
       {(Object.keys(CHARGERS) as ChargerType[]).map((k) => (
-        <NumberField key={k} label={`${CHARGERS[k].label} / port`} value={settings.cost.portCost[k]} step={500} min={0} suffix="$" onChange={(v) => setCost({ portCost: { ...settings.cost.portCost, [k]: v } })} />
+        <NumberField key={k} label={`${CHARGERS[k].label} · per plug`} value={settings.cost.portCost[k]} step={500} min={0} suffix="$" onChange={(v) => setCost({ portCost: { ...settings.cost.portCost, [k]: v } })} />
       ))}
-      <NumberField label="Make-ready $/kW" value={settings.cost.makeReadyPerKw} step={25} min={0} suffix="$/kW" onChange={(makeReadyPerKw) => setCost({ makeReadyPerKw })} help="Customer- and utility-side infrastructure: service, switchgear, trenching, metering." />
-      <NumberField label="Transformer upgrade" value={settings.cost.xfmrUpgrade} step={10000} min={0} suffix="$" onChange={(xfmrUpgrade) => setCost({ xfmrUpgrade })} help="Added when a transformer goes critical." />
-      <NumberField label="Feeder reinforcement $/MW over" value={settings.cost.feederPerMwOver} step={50000} min={0} suffix="$" onChange={(feederPerMwOver) => setCost({ feederPerMwOver })} />
-      <NumberField label="Storage $/kWh" value={settings.cost.storagePerKwh} step={25} min={0} suffix="$" onChange={(storagePerKwh) => setCost({ storagePerKwh })} />
-      <Slider label="Incentive share (base)" value={settings.cost.incentiveBase} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(incentiveBase) => setCost({ incentiveBase })} />
-      <Slider label="Incentive share (DAC)" value={settings.cost.incentiveDac} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(incentiveDac) => setCost({ incentiveDac })} />
-      <NumberField label="Incentive cap / site" value={settings.cost.incentiveCap} step={100000} min={0} suffix="$" onChange={(incentiveCap) => setCost({ incentiveCap })} />
+      <NumberField label="Wiring to the parking spot (make-ready) $/kW" value={settings.cost.makeReadyPerKw} step={25} min={0} suffix="$/kW" onChange={(makeReadyPerKw) => setCost({ makeReadyPerKw })} help="Everything between the street and the charger: new service, switchgear, trenching, meters. Like plumbing before you buy the faucet." />
+      <NumberField label="New transformer, if a tap goes red" value={settings.cost.xfmrUpgrade} step={10000} min={0} suffix="$" onChange={(xfmrUpgrade) => setCost({ xfmrUpgrade })} help="Added to a site's cost each time a transformer light turns red." />
+      <NumberField label="Street-main upgrade, per MW over the line" value={settings.cost.feederPerMwOver} step={50000} min={0} suffix="$" onChange={(feederPerMwOver) => setCost({ feederPerMwOver })} />
+      <NumberField label="Battery $/kWh" value={settings.cost.storagePerKwh} step={25} min={0} suffix="$" onChange={(storagePerKwh) => setCost({ storagePerKwh })} />
+      <Slider label="Grant covers this share of wiring" value={settings.cost.incentiveBase} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(incentiveBase) => setCost({ incentiveBase })} />
+      <Slider label="… in disadvantaged communities" value={settings.cost.incentiveDac} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(incentiveDac) => setCost({ incentiveDac })} />
+      <NumberField label="Grant cap per site" value={settings.cost.incentiveCap} step={100000} min={0} suffix="$" onChange={(incentiveCap) => setCost({ incentiveCap })} />
     </div>
   );
 }

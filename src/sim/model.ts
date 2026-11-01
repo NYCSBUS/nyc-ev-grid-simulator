@@ -107,7 +107,7 @@ export function assessSite(site: Site, ctx: SiteContext, settings: Settings): Si
       status: share > 0 ? statusFor(ratio, settings.thresholds) : 'unknown',
       props: x.f.properties ?? {},
       geometry: x.f.geometry,
-      note: share > 0 ? `Allocated ${(share * 100).toFixed(0)}% of coincident site load` : 'Within radius, no load allocated',
+      note: share > 0 ? `Tap · takes ${(share * 100).toFixed(0)}% of this site's load` : 'Tap nearby · not used by this site',
     });
   });
 
@@ -143,7 +143,7 @@ export function assessSite(site: Site, ctx: SiteContext, settings: Settings): Si
       status: i === 0 ? statusFor(ratio === Infinity ? 99 : ratio, settings.thresholds) : 'unknown',
       props: p,
       geometry: x.f.geometry,
-      note: i === 0 ? 'Nearest feeder: full coincident load allocated' : 'Alternate feeder within radius',
+      note: i === 0 ? 'Street main · carries all of this site\'s load' : 'Another street main nearby · not used',
     });
   });
 
@@ -164,7 +164,7 @@ export function assessSite(site: Site, ctx: SiteContext, settings: Settings): Si
       status: statusFor(ratio, settings.thresholds),
       props: plate.properties ?? {},
       geometry: plate.geometry,
-      note: 'Secondary network plate hosting capacity (kVA)',
+      note: 'Map sheet of the underground web · room left in kVA',
     });
   }
 
@@ -186,7 +186,7 @@ export function assessSite(site: Site, ctx: SiteContext, settings: Settings): Si
       status: p.CapacityMW > 0 ? statusFor(ratio, settings.thresholds) : 'unknown',
       props: p,
       geometry: network.geometry,
-      note: p.CapacityMW > 0 ? 'Network LSRV (non-wires) remaining MW' : 'No network-level MW published for this network',
+      note: p.CapacityMW > 0 ? 'Grid zone · spare MW Con Edison is buying back (LSRV)' : 'Grid zone · Con Edison publishes no spare MW here',
     });
   }
 
@@ -214,7 +214,7 @@ export function assessSite(site: Site, ctx: SiteContext, settings: Settings): Si
           status: share > 0 ? statusFor(ratio, settings.thresholds) : 'unknown',
           props: x.f.properties ?? {},
           geometry: x.f.geometry,
-          note: share > 0 ? `Network structure (vault) kVA · ${(share * 100).toFixed(0)}% of load` : 'Nearby structure, no load allocated',
+          note: share > 0 ? `Underground vault · takes ${(share * 100).toFixed(0)}% of this site's load` : 'Vault nearby · not used by this site',
         });
       });
   }
@@ -227,9 +227,9 @@ export function assessSite(site: Site, ctx: SiteContext, settings: Settings): Si
   const notes: string[] = [];
   if (inNetworkArea && feeders.length === 0)
     notes.push(
-      'Secondary-network area: Con Edison publishes feeder EV headroom only for radial areas. Capacity here is expressed by the M&S plate and network structures (kVA) instead.',
+      'This is a "web" area (Con Edison: secondary network): many transformers share one underground grid, so Con Edison publishes room left per map sheet and per vault rather than per street main. That is why no street main is listed.',
     );
-  if (!inNetworkArea && xf.length === 0 && feeders.length === 0) notes.push('No EV-map assets within the radius. Widen the radius or check the site is inside Con Edison territory.');
+  if (!inNetworkArea && xf.length === 0 && feeders.length === 0) notes.push('No Con Edison equipment found in the search circle. Try a wider circle, or check the site is inside Con Edison\'s territory (NYC + Westchester).');
 
   return {
     siteId: site.id,

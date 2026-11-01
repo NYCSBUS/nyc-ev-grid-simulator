@@ -33,7 +33,7 @@ export function ScenarioPanel() {
       </h2>
 
       <h3>
-        Sites ({scenario.sites.length}) <Help text="Each site is a charging project at a specific address. The simulator assigns its coincident peak load to the nearest transformer(s), feeder, M&S plate and network and compares it with published hosting capacity." />
+        Charging sites ({scenario.sites.length}) <Help text="A site is one charging project at one address. The simulator works out what it draws at the grid's 5 PM rush hour, sends that load to the nearest grid equipment (transformers, street mains, vaults, grid zone) and checks how much room each has left." />
       </h3>
       <div className="row" style={{ marginBottom: 8 }}>
         <button id="tour-add-site" className={`btn primary ${placing ? 'active' : ''}`} onClick={() => setPlacing(!placing)}>
@@ -75,18 +75,18 @@ export function ScenarioPanel() {
             <div className="meta">
               {s.address ?? `${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}`}
               <br />
-              {portCount(s)} ports · {fmt.kw(nameplateKw(s))} nameplate · {PROFILES[s.profile].label}
+              {portCount(s)} plugs · {fmt.kw(nameplateKw(s))} sticker · {PROFILES[s.profile].label}
               {a && (
                 <>
                   {' '}
-                  · coincident {fmt.kw(a.coincidentKw)} {a.inDac && <span className="pill warn">DAC</span>}
+                  · {fmt.kw(a.coincidentKw)} at 5 PM rush {a.inDac && <span className="pill warn">DAC</span>}
                 </>
               )}
             </div>
           </div>
         );
       })}
-      {!scenario.sites.length && <div className="empty">No sites yet. Add one on the map.</div>}
+      {!scenario.sites.length && <div className="empty">No charging sites yet. Search an address above or click “Add site on map”.</div>}
 
       {selected && <SiteEditor site={selected} />}
 
@@ -111,7 +111,7 @@ function SiteEditor({ site }: { site: Site }) {
       </div>
 
       <h3 id="tour-chargers">
-        Chargers <Help text="Port counts by charger type. Nameplate kW = Σ ports × kW. DC fast ports usually need a 460/480 V service, so the simulator prefers a 460 V transformer when one is within the radius." />
+        Chargers <Help text="How many plugs of each kind. Level 2 = overnight-speed (like a dryer outlet); DC fast = 20-minute charging. Adding them up gives the sticker rating (nameplate). Fast chargers need the higher-voltage 460 V type of transformer, so the simulator looks for one of those first." />
       </h3>
       <div className="charger-grid">
         {(Object.keys(CHARGERS) as ChargerType[]).map((k) => (
@@ -128,89 +128,89 @@ function SiteEditor({ site }: { site: Site }) {
         ))}
       </div>
       <div className="row between" style={{ marginTop: 8 }}>
-        <span className="muted">Nameplate</span>
+        <span className="muted">Sticker rating (nameplate)</span>
         <b>{fmt.kw(nameplateKw(site))}</b>
       </div>
 
-      <h3 id="tour-loadshape">Load shape</h3>
+      <h3 id="tour-loadshape">When and how hard it charges</h3>
       <Select
-        label="Use profile"
+        label="What kind of place"
         value={site.profile}
         options={(Object.keys(PROFILES) as Array<keyof typeof PROFILES>).map((p) => ({ value: p, label: PROFILES[p].label }))}
         onChange={(profile) => set({ profile })}
         help={PROFILES[site.profile].desc}
       />
       <Slider
-        label="Peak utilization"
+        label="Plugs in use at busiest hour"
         value={site.utilization}
         min={0.1}
         max={1}
         step={0.05}
         format={(v) => fmt.pct(v)}
         onChange={(utilization) => set({ utilization })}
-        help="Share of ports drawing power at the busiest hour. Public DCFC hubs rarely exceed 60–80%; depots can hit 100%."
+        help="How many of the plugs have a car attached at the busiest moment (engineers: utilization). Public fast-charging stations rarely top 60–80 %; a truck depot at night can hit 100 %."
       />
       <Slider
-        label="Diversity factor"
+        label="Charging taper"
         value={site.diversity}
         min={0.3}
         max={1}
         step={0.05}
         format={(v) => fmt.pct(v)}
         onChange={(diversity) => set({ diversity })}
-        help="Vehicles taper power as batteries fill, so average draw per active port is below nameplate. 1.0 = no diversity."
+        help="Like a phone, a car charges slowly once it is nearly full, so an occupied plug rarely draws its maximum (engineers: diversity). 100 % = every plug at full blast."
       />
       <Check
-        label="Managed charging"
+        label="Smart (managed) charging"
         checked={site.managed}
         onChange={(managed) => set({ managed })}
-        help="Shifts and flattens charging away from the 5–6 PM system peak (e.g. via Con Edison SmartCharge / load management). Changes the hourly shape; nameplate is unchanged."
+        help="Like running the dishwasher after 10 PM: charging is delayed or slowed to avoid the grid's 5–6 PM rush (Con Edison runs programs like SmartCharge for this). Same chargers, different timing."
       />
-      <Slider label="Battery storage power" value={site.storageKw} min={0} max={2000} step={50} format={(v) => fmt.kw(v)} onChange={(storageKw) => set({ storageKw })} help="On-site battery that discharges to shave site peak." />
+      <Slider label="On-site battery · power" value={site.storageKw} min={0} max={2000} step={50} format={(v) => fmt.kw(v)} onChange={(storageKw) => set({ storageKw })} help="A battery is a water tank for electricity: it fills overnight and tops up the station at rush hour. Power (kW) = how fast it can pour." />
       <Slider
-        label="Battery storage energy"
+        label="On-site battery · size"
         value={site.storageKwh}
         min={0}
         max={8000}
         step={100}
         format={(v) => `${v} kWh`}
         onChange={(storageKwh) => set({ storageKwh })}
-        help="Energy available for peak shaving per day. Peak reduction is limited by both kW and kWh."
+        help="How much the tank holds (kWh). The peak it can trim is limited by both how fast it pours and how much it holds."
       />
 
-      <h3>Grid connection</h3>
-      <Slider label="Asset search radius" value={site.radiusM} min={50} max={800} step={25} format={fmt.m} onChange={(radiusM) => set({ radiusM })} help="Transformers and feeders within this distance are considered. Secondary-network areas in Manhattan can tolerate a wider radius." />
+      <h3>How it connects to the grid</h3>
+      <Slider label="How far to look for grid equipment" value={site.radiusM} min={50} max={800} step={25} format={fmt.m} onChange={(radiusM) => set({ radiusM })} help="Only transformers, street mains and vaults inside this circle are checked. In dense 'web' areas like Manhattan the load can travel further, so a wider circle is reasonable." />
       <Select
-        label="Load sharing"
+        label="How the load spreads"
         value={site.sharing}
         options={[
-          { value: 'grid', label: 'Secondary grid: 60/25/15% across nearest 3' },
-          { value: 'single', label: 'Radial: 100% on nearest transformer' },
+          { value: 'grid', label: 'Web: 60 / 25 / 15 % over nearest 3 taps' },
+          { value: 'single', label: 'Single pipe: 100 % on nearest tap' },
         ]}
         onChange={(sharing) => set({ sharing })}
-        help="In Con Edison's secondary networks several transformers feed a meshed low-voltage grid, so new load is shared. Radial / outer-borough services typically hang off a single transformer."
+        help="In dense parts of the city the grid is a web (Con Edison: secondary network): several transformers feed one shared underground grid, so new load spreads across neighbours. In the outer boroughs a building usually hangs off a single transformer, like a cul-de-sac with one road in."
       />
 
       <h3 id="tour-impact">
-        Impact at system peak{' '}
-        <Help text="Traffic lights compare the load this site adds at the system peak hour to the headroom published on Con Edison's hosting-capacity maps. Transformer ranges are converted to kVA using the settings." />
+        Traffic lights at the 5 PM rush{' '}
+        <Help text="Each row is a piece of nearby grid equipment. The percentage is how much of its remaining room this site would use at the grid's rush hour: green under 60 %, amber up to 100 %, red over. Numbers come from Con Edison's public capacity maps." />
       </h3>
-      {!a && <div className="muted">Loading grid data around the site…</div>}
+      {!a && <div className="muted">Loading Con Edison equipment around the site…</div>}
       {a && (
         <>
           <div className="row between" style={{ marginBottom: 6 }}>
             <span>
-              Peak {fmt.kw(a.peakKw)} · at system peak <b>{fmt.kw(a.coincidentKw)}</b>
+              Busiest moment {fmt.kw(a.peakKw)} · at the 5 PM rush <b>{fmt.kw(a.coincidentKw)}</b>
             </span>
             <StatusPill status={a.worst} />
           </div>
-          {live.loading.transformers || live.loading.feeders || live.loading.structures ? <div className="muted">Refreshing assets…</div> : null}
+          {live.loading.transformers || live.loading.feeders || live.loading.structures ? <div className="muted">Refreshing equipment…</div> : null}
           {a.notes.map((n) => (
             <div key={n} className="callout" style={{ fontSize: 12 }}>
               {n}
             </div>
           ))}
-          {a.assets.length === 0 && !a.notes.length && <div className="muted">No Con Edison assets found within {site.radiusM} m. Try widening the radius.</div>}
+          {a.assets.length === 0 && !a.notes.length && <div className="muted">No Con Edison equipment found within {site.radiusM} m. Try a wider search circle.</div>}
           {[...a.assets.filter((x) => x.ratio != null), ...a.assets.filter((x) => x.ratio == null).slice(0, 6)].map((x) => (
             <div className="asset" key={x.id}>
               <StatusDot status={x.status} />
@@ -231,7 +231,7 @@ function SiteEditor({ site }: { site: Site }) {
           ))}
           {a.assets.filter((x) => x.ratio == null).length > 6 && (
             <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              + {a.assets.filter((x) => x.ratio == null).length - 6} more assets within the radius with no load allocated (all shown on the map).
+              + {a.assets.filter((x) => x.ratio == null).length - 6} more pieces of equipment nearby that this site does not draw from (all shown on the map).
             </div>
           )}
         </>
@@ -248,42 +248,42 @@ function AreaEditor() {
     <div className="section" id="tour-area">
       <h3 style={{ marginTop: 0, display: 'flex', justifyContent: 'space-between' }}>
         <span>
-          Area-wide EV adoption <Help text="Simulates organic EV growth across every census tract: EVs = tract vehicles × adoption share; peak kW = EVs × home-charging share × charger kW × coincidence, less managed-charging savings. Results aggregate to Con Edison networks." />
+          Borough-wide EV growth <Help text="Zooms out from single sites to whole neighbourhoods. Recipe: count the cars in each Census neighbourhood, assume a share go electric by the chosen year, estimate how many are plugged in at 5 PM, and add it up for each Con Edison grid zone." />
         </span>
         <Check label="Enable" checked={area.enabled} onChange={(enabled) => setArea({ enabled })} />
       </h3>
-      <Slider label="Scenario year" value={area.year} min={2024} max={2045} onChange={(year) => setArea({ year })} />
-      <Select label="Adoption curve" value={area.curve} options={(Object.keys(CURVE_LABELS) as Array<keyof typeof CURVE_LABELS>).map((k) => ({ value: k, label: CURVE_LABELS[k] }))} onChange={(curve) => setArea({ curve })} help="Share of light-duty vehicles that are plug-in EVs. 'Policy' follows the NY Advanced Clean Cars II trajectory (100% ZEV sales by 2035)." />
-      {area.curve === 'custom' && <Slider label="EV share in 2035" value={area.custom2035} min={0.05} max={0.8} step={0.01} format={(v) => fmt.pct(v)} onChange={(custom2035) => setArea({ custom2035 })} />}
+      <Slider label="Year" value={area.year} min={2024} max={2045} onChange={(year) => setArea({ year })} />
+      <Select label="How fast cars go electric" value={area.curve} options={(Object.keys(CURVE_LABELS) as Array<keyof typeof CURVE_LABELS>).map((k) => ({ value: k, label: CURVE_LABELS[k] }))} onChange={(curve) => setArea({ curve })} help="Share of cars on the road that are electric in the chosen year. 'Policy' follows New York's rule that all new cars sold are zero-emission by 2035 (the cars on the road lag new sales by about a decade)." />
+      {area.curve === 'custom' && <Slider label="Share of cars electric in 2035" value={area.custom2035} min={0.05} max={0.8} step={0.01} format={(v) => fmt.pct(v)} onChange={(custom2035) => setArea({ custom2035 })} />}
       <div className="row between muted" style={{ fontSize: 12 }}>
-        <span>EV fleet share in {area.year}</span>
+        <span>Cars that are electric in {area.year}</span>
         <b style={{ color: 'var(--accent)' }}>{fmt.pct(evShare(area.curve, area.year, area.custom2035), 1)}</b>
       </div>
-      <Slider label="Home charging share" value={area.homeShare} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(homeShare) => setArea({ homeShare })} help="Share of EVs with a dedicated home/garage charger. Lower in renter-heavy tracts; the remainder is covered by the public kW/EV term." />
-      <Slider label="Home charger kW" value={area.evKw} min={1.4} max={19.2} step={0.1} format={(v) => `${v} kW`} onChange={(evKw) => setArea({ evKw })} />
-      <Slider label="Peak coincidence" value={area.coincidence} min={0.05} max={0.6} step={0.01} format={(v) => fmt.pct(v)} onChange={(coincidence) => setArea({ coincidence })} help="Fraction of home chargers drawing at the system peak hour if unmanaged. Utility studies put this at 15–30%." />
-      <Slider label="Managed charging enrolment" value={area.managedShare} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(managedShare) => setArea({ managedShare })} />
-      <Slider label="Managed peak reduction" value={area.managedReduction} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(managedReduction) => setArea({ managedReduction })} help="How much an enrolled charger's peak contribution falls (e.g. 60% for a delay-to-midnight program)." />
-      <Slider label="Public / fleet kW per EV" value={area.publicKwPerEv} min={0} max={1} step={0.01} format={(v) => `${v.toFixed(2)} kW`} onChange={(publicKwPerEv) => setArea({ publicKwPerEv })} help="Coincident public & fleet charging load attributed to each EV in the tract." />
+      <Slider label="EV drivers who can charge at home" value={area.homeShare} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(homeShare) => setArea({ homeShare })} help="Share of EV drivers who can charge at home or in their building's garage. Low where most people rent and park on the street; those drivers charge in public instead (next slider but one)." />
+      <Slider label="Home charger power" value={area.evKw} min={1.4} max={19.2} step={0.1} format={(v) => `${v} kW`} onChange={(evKw) => setArea({ evKw })} />
+      <Slider label="Home chargers busy at 5 PM" value={area.coincidence} min={0.05} max={0.6} step={0.01} format={(v) => fmt.pct(v)} onChange={(coincidence) => setArea({ coincidence })} help="Of all the home chargers, the share actually drawing power at the grid's 5 PM rush if nobody manages them. Utility studies find 15–30 %." />
+      <Slider label="Share on smart charging" value={area.managedShare} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(managedShare) => setArea({ managedShare })} />
+      <Slider label="Rush-hour cut from smart charging" value={area.managedReduction} min={0} max={1} step={0.05} format={(v) => fmt.pct(v)} onChange={(managedReduction) => setArea({ managedReduction })} help="How much a smart-charging driver's 5 PM draw falls, e.g. 60 % for a program that delays charging to midnight." />
+      <Slider label="Public & fleet charging per EV" value={area.publicKwPerEv} min={0} max={1} step={0.01} format={(v) => `${v.toFixed(2)} kW`} onChange={(publicKwPerEv) => setArea({ publicKwPerEv })} help="Extra 5 PM load per EV from public chargers, taxis, delivery vans and so on, spread across the neighbourhood." />
       <div className="row between muted" style={{ fontSize: 12 }}>
-        <span>Coincident kW per EV</span>
+        <span>Rush-hour load per EV (all effects)</span>
         <b style={{ color: 'var(--accent)' }}>{kwPerEv(area).toFixed(2)} kW</b>
       </div>
-      <h3>Scope</h3>
+      <h3>Which boroughs</h3>
       <Chips options={BOROUGHS.map((b) => ({ value: b, label: b }))} value={area.boroughs} onChange={(boroughs) => setArea({ boroughs })} />
       <Check label="Disadvantaged communities only" checked={area.dacOnly} onChange={(dacOnly) => setArea({ dacOnly })} />
       {result && (
         <div className="section" style={{ marginTop: 10, background: 'var(--bg)' }}>
           <div className="row between">
-            <span className="muted">EVs in scope</span>
+            <span className="muted">EVs on the road</span>
             <b>{fmt.int(result.totalEvs)}</b>
           </div>
           <div className="row between">
-            <span className="muted">Added coincident load</span>
+            <span className="muted">Extra load at the 5 PM rush</span>
             <b>{fmt.mw(result.totalAddedMw)}</b>
           </div>
           <div className="row between">
-            <span className="muted">Networks critical / watch</span>
+            <span className="muted">Grid zones red / amber</span>
             <b>
               <span style={{ color: 'var(--crit)' }}>{result.networkStats.filter((n) => n.status === 'crit').length}</span> /{' '}
               <span style={{ color: 'var(--warn)' }}>{result.networkStats.filter((n) => n.status === 'warn').length}</span>

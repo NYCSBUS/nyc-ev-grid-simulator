@@ -37,7 +37,7 @@ export function MissionsPanel() {
         </button>
       </h2>
       <p className="muted">
-        Optional challenges modelled on the EV Strategy group's actual tasks: siting, equity targets, load forecasting, and budget-constrained portfolio design. {done.length}/{MISSIONS.length} complete.
+        Optional practice challenges based on what an EV program analyst actually does: finding sites, meeting fairness targets, forecasting load, and building a portfolio on a budget. They are checked automatically as you work. {done.length}/{MISSIONS.length} complete.
       </p>
       {MISSIONS.map((m) => {
         const r = m.check(ctx);

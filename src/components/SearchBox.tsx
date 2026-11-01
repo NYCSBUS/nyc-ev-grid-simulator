@@ -62,7 +62,7 @@ export function SearchBox() {
           if (e.key === 'Enter' && results[0]) pick(results[0]);
           if (e.key === 'Escape') setOpen(false);
         }}
-        placeholder="Search an NYC address to simulate EV load…"
+        placeholder="Type an NYC address to try chargers there…"
       />
       {open && results.length > 0 && (
         <div className="results">
@@ -79,7 +79,7 @@ export function SearchBox() {
             Simulate new EV load at this address?
           </span>
           <button className="btn primary small" onClick={simulateHere}>
-            Add site here
+            Put chargers here
           </button>
           <button className="btn small" onClick={() => setPending(null)}>
             Dismiss

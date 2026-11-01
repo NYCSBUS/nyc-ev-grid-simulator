@@ -4,18 +4,18 @@ import { Check, Help } from './ui';
 import type { LayerVisibility } from '../types';
 
 const LAYER_DEFS: Array<{ key: keyof LayerVisibility; label: string; help: string; minZoom?: number; source: string }> = [
-  { key: 'sites', label: 'Scenario sites & impact', help: 'Your charging sites, their search radius, and highlighted impacted assets.', source: 'Simulator' },
-  { key: 'transformers', label: 'EV transformers (208 V / 460 V)', help: 'Con Edison EV hosting-capacity map: distribution transformers with available capacity range. 460 V units have a white ring.', minZoom: MIN_ZOOM.transformers, source: 'CECONY_EVM_Prod / _Winter_Prod' },
-  { key: 'feeders', label: 'Primary feeders (EV headroom)', help: '3-phase primary feeders coloured by EV load headroom in MW (season follows Settings).', minZoom: MIN_ZOOM.feeders, source: 'CECONY_EVM_Feeders_Prod' },
-  { key: 'feeders33kv', label: '33 kV sub-transmission feeders', help: 'Higher-voltage feeders supplying area substations.', minZoom: MIN_ZOOM.feeders33kv, source: 'CECONY_33Kv_Prod' },
-  { key: 'structures', label: 'Network structures (kVA)', help: 'Manholes / vaults in secondary networks with hosting capacity in kVA. 155k points — only loads at high zoom.', minZoom: MIN_ZOOM.structures, source: 'CE_NwkHcv_StructureHCV_Prod' },
-  { key: 'msplates', label: 'M&S plates (secondary network kVA)', help: 'Mains & Services plate polygons with hosting capacity in kVA for the low-voltage secondary grid.', source: 'CE_NwkHcv_MSPlateHCV_Prod' },
-  { key: 'networks', label: 'Con Edison networks', help: 'The 89 distribution networks / load areas with LSRV (non-wires) capacity where published.', source: 'CECONY_NetworkLCSD_Prod' },
-  { key: 'nws', label: 'Non-wires solution networks', help: 'Networks where Con Edison is procuring non-wires alternatives instead of traditional upgrades.', source: 'CE_NWS_Networks_Prod' },
-  { key: 'dac', label: 'Disadvantaged communities', help: 'NY CLCPA Disadvantaged Community census tracts (Con Edison service territory).', source: 'CECONY_Disadvantaged_Communities_Prod' },
-  { key: 'tracts', label: 'Census tracts (demographics)', help: 'ACS 5-year tract polygons. Choose a variable in Filters to colour them.', source: 'TIGERweb + Census Reporter (ACS)' },
-  { key: 'buildings', label: 'Buildings (MapPLUTO + footprints)', help: 'NYC building footprints extruded by height and coloured by land use, joined to MapPLUTO lot attributes. Shift-click to add a site.', minZoom: MIN_ZOOM.buildings, source: 'NYC Open Data 5zhs-2jue + 64uk-42ks' },
-  { key: 'areaStress', label: 'Area-scenario stress overlay', help: 'When the area scenario is on: tracts shaded by added EV kW/km² and networks by status.', source: 'Simulator' },
+  { key: 'sites', label: 'My charging sites', help: 'Your sites, their search circle, and the grid equipment they draw from, coloured by traffic light.', source: 'Simulator' },
+  { key: 'transformers', label: 'Transformers (the "taps")', help: 'Con Edison\'s transformers, coloured like a fuel gauge by how much room they have left (green = lots, red = nearly full). A white ring marks the 460 V type that fast chargers need.', minZoom: MIN_ZOOM.transformers, source: 'CECONY_EVM_Prod / _Winter_Prod' },
+  { key: 'feeders', label: 'Street mains (feeders)', help: 'The cables under the street that supply the transformers, coloured by how many MW of room they have left for EVs. Only published outside the dense "web" areas.', minZoom: MIN_ZOOM.feeders, source: 'CECONY_EVM_Feeders_Prod' },
+  { key: 'feeders33kv', label: 'High-voltage trunk lines (33 kV)', help: 'The bigger lines that feed the substations. For orientation only.', minZoom: MIN_ZOOM.feeders33kv, source: 'CECONY_33Kv_Prod' },
+  { key: 'structures', label: 'Underground vaults (structures)', help: 'The rooms under manhole covers where cables join, each with its own room-left figure. 155,000 of them — only shown when zoomed in close.', minZoom: MIN_ZOOM.structures, source: 'CE_NwkHcv_StructureHCV_Prod' },
+  { key: 'msplates', label: 'Underground map sheets (M&S plates)', help: 'Pages of Con Edison\'s underground atlas. In the dense "web" areas, room left is published per page.', source: 'CE_NwkHcv_MSPlateHCV_Prod' },
+  { key: 'networks', label: 'Grid zones (networks)', help: 'Con Edison\'s 89 neighbourhood-sized grid zones. Some publish spare MW Con Edison will pay customers to free up (LSRV).', source: 'CECONY_NetworkLCSD_Prod' },
+  { key: 'nws', label: 'Zones buying load relief (non-wires)', help: 'Grid zones where Con Edison is paying customers to use less at peak instead of building new equipment.', source: 'CE_NWS_Networks_Prod' },
+  { key: 'dac', label: 'Disadvantaged communities (DAC)', help: 'Neighbourhoods New York State has flagged as Disadvantaged Communities under its climate law. Charging grants are larger here.', source: 'CECONY_Disadvantaged_Communities_Prod' },
+  { key: 'tracts', label: 'Neighbourhood statistics (Census)', help: 'Census neighbourhoods (tracts). Pick what to colour them by in Filters: income, renters, car ownership and so on.', source: 'TIGERweb + Census Reporter (ACS)' },
+  { key: 'buildings', label: 'Buildings', help: 'NYC buildings in 3-D, coloured by what they are used for (homes, shops, factories, parking). Shift-click one to put a site there.', minZoom: MIN_ZOOM.buildings, source: 'NYC Open Data 5zhs-2jue + 64uk-42ks' },
+  { key: 'areaStress', label: 'Borough-wide growth heat map', help: 'When borough-wide growth is on: neighbourhoods shaded by how much new EV load lands there, and grid zones coloured by traffic light.', source: 'Simulator' },
 ];
 
 export function LayersPanel() {
@@ -27,7 +27,7 @@ export function LayersPanel() {
   return (
     <div className="panel" id="tour-layers">
       <h2>Layers</h2>
-      <p className="muted">Heavy layers load live from Con Edison / NYC Open Data when you zoom in. Current zoom: {zoom.toFixed(1)}</p>
+      <p className="muted">Detailed layers stream in from Con Edison and NYC Open Data as you zoom in. Current zoom: {zoom.toFixed(1)}</p>
       {LAYER_DEFS.map((d) => (
         <div key={d.key} className="row between" style={{ padding: '2px 0' }}>
           <Check
@@ -51,17 +51,17 @@ export function LayersPanel() {
         </div>
       ))}
       <h3>
-        Live feature counts <Help text="Features currently loaded in the viewport (deduplicated)." />
+        Loaded right now <Help text="How many pieces of equipment and buildings are loaded for the area on screen." />
       </h3>
       <div className="muted" style={{ fontSize: 12 }}>
-        Transformers {live.transformers.features.length.toLocaleString()} · Feeder segments {live.feeders.features.length.toLocaleString()} · Structures {live.structures.features.length.toLocaleString()} · Buildings{' '}
+        Transformers {live.transformers.features.length.toLocaleString()} · Street-main segments {live.feeders.features.length.toLocaleString()} · Vaults {live.structures.features.length.toLocaleString()} · Buildings{' '}
         {live.buildings.features.length.toLocaleString()}
       </div>
       {meta && (
         <>
           <h3>Snapshot data</h3>
           <div className="muted" style={{ fontSize: 12 }}>
-            Networks, plates, DAC and tract snapshots generated {new Date(meta.generated).toLocaleDateString()}. Refresh with <code>npm run snapshots</code>.
+            Grid zones, map sheets, DAC and Census snapshots generated {new Date(meta.generated).toLocaleDateString()}. Refresh with <code>npm run snapshots</code>.
           </div>
         </>
       )}

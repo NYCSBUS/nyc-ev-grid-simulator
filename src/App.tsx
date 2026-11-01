@@ -15,12 +15,12 @@ import { MISSIONS } from './sim/missions';
 import { Tip } from './components/ui';
 
 const RAIL: Array<{ id: Panel; icon: string; label: string }> = [
-  { id: 'scenario', icon: '⚡', label: 'Scenario: sites & area adoption' },
+  { id: 'scenario', icon: '⚡', label: 'Scenario: charging sites & borough-wide growth' },
   { id: 'layers', icon: '◧', label: 'Map layers' },
   { id: 'filters', icon: '⚲', label: 'Filters' },
-  { id: 'settings', icon: '⚙', label: 'Model settings' },
-  { id: 'missions', icon: '◎', label: 'Missions' },
-  { id: 'saved', icon: '▤', label: 'Saved scenarios, share & compare' },
+  { id: 'settings', icon: '⚙', label: 'Settings: the knobs behind the maths' },
+  { id: 'missions', icon: '◎', label: 'Missions: practice challenges' },
+  { id: 'saved', icon: '▤', label: 'Saved scenarios, share link & compare' },
 ];
 
 export default function App() {
@@ -65,7 +65,7 @@ export default function App() {
         </nav>
         <span className="spacer" />
         <SearchBox />
-        <Tip text="Guided walkthrough: the app answers five real analyst questions step by step">
+        <Tip text="5-minute guided tour: the app drives itself through five real questions">
           <button className="btn small" onClick={() => requestTour(true)}>
             Tour
           </button>

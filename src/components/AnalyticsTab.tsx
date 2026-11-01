@@ -247,7 +247,7 @@ export function AnalyticsTab() {
         </h2>
         <div className="row">
           <select value={compareId ?? ''} onChange={(e) => setCompare(e.target.value || null)} style={{ background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px' }} title="Compare with a saved scenario">
-            <option value="">Compare with saved scenario…</option>
+            <option value="">Compare with a saved scenario…</option>
             {saved.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -258,33 +258,33 @@ export function AnalyticsTab() {
             CSV: sites
           </button>
           <button className="btn" onClick={() => downloadCsv(assetRows.map((r) => ({ site: r.site, asset: r.name, kind: r.kind, distance_m: r.distanceM, added_kw: Math.round(r.addedKw), headroom_kw: r.headroomKw != null ? Math.round(r.headroomKw) : '', ratio: r.ratio?.toFixed(3) ?? '', status: r.status })), 'assets')}>
-            CSV: assets
+            CSV: equipment
           </button>
           {area && (
             <button className="btn" onClick={() => downloadCsv(area.networkStats.map((n) => ({ network: n.network, borough: n.borough, evs: Math.round(n.evs), added_mw: n.addedMw.toFixed(3), plate_headroom_mw: n.plateHeadroomMw?.toFixed(2) ?? '', lsrv_remaining_mw: n.remainingMw?.toFixed(2) ?? '', ratio: n.ratio?.toFixed(3) ?? '', status: n.status, dac_share: n.dacShare.toFixed(3) })), `networks_${area.year}`)}>
-              CSV: networks
+              CSV: grid zones
             </button>
           )}
         </div>
       </div>
 
       <div className="kpis" id="tour-kpis">
-        <Kpi label="Sites / ports" value={`${scenario.sites.length} / ${sum.ports}`} b={sumB ? `${compare!.sites.length} / ${sumB.ports}` : undefined} />
-        <Kpi label="Nameplate" value={fmt.kw(sum.nameplate)} help="Sum of port kW across all sites." b={sumB ? fmt.kw(sumB.nameplate) : undefined} />
-        <Kpi label="Coincident peak" value={fmt.kw(sum.coincident)} sub={`at ${peakHour}:00 · site peak ${fmt.kw(sum.peak)}`} help="Total load at the system peak hour after profiles, diversity, managed charging and storage." b={sumB ? fmt.kw(sumB.coincident) : undefined} />
-        <Kpi label="Annual energy" value={`${fmt.int(sum.annualMwh)} MWh`} b={sumB ? `${fmt.int(sumB.annualMwh)} MWh` : undefined} />
-        <Kpi label="Assets critical / watch" value={`${sum.crit} / ${sum.warn}`} help="Count of transformers, feeders, plates and networks at or over thresholds." b={sumB ? `${sumB.crit} / ${sumB.warn}` : undefined} />
-        <Kpi label="Est. total cost" value={fmt.usd(sum.cost)} sub={`incentive ${fmt.usd(sum.incentive)} · net ${fmt.usd(sum.cost - sum.incentive)}`} b={sumB ? fmt.usd(sumB.cost) : undefined} />
-        <Kpi label="Sites in DACs" value={`${sum.dacSites} / ${scenario.sites.length}`} help="NY CLCPA target: ≥ 35% of benefits to disadvantaged communities." b={sumB ? `${sumB.dacSites} / ${compare!.sites.length}` : undefined} />
-        {area && <Kpi label={`Area EVs (${area.year})`} value={fmt.int(area.totalEvs)} sub={`${fmt.pct(area.evShare, 1)} of ${fmt.int(area.totalVehicles)} vehicles`} b={compareArea ? `${fmt.int(compareArea.totalEvs)} (${compareArea.year})` : undefined} />}
-        {area && <Kpi label="Area added peak" value={fmt.mw(area.totalAddedMw)} sub={`${area.networkStats.filter((n) => n.status === 'crit').length} networks critical`} b={compareArea ? fmt.mw(compareArea.totalAddedMw) : undefined} />}
+        <Kpi label="Sites / plugs" value={`${scenario.sites.length} / ${sum.ports}`} b={sumB ? `${compare!.sites.length} / ${sumB.ports}` : undefined} />
+        <Kpi label="Sticker rating" value={fmt.kw(sum.nameplate)} help="All plugs' maximum power added up (nameplate). Almost never drawn in practice." b={sumB ? fmt.kw(sumB.nameplate) : undefined} />
+        <Kpi label="Load at grid rush hour" value={fmt.kw(sum.coincident)} sub={`at ${peakHour}:00 · sites' own busiest moment ${fmt.kw(sum.peak)}`} help="What all sites together draw at the grid's rush hour, after allowing for who is plugged in, charging taper, smart charging and batteries. This is the number that matters to Con Edison." b={sumB ? fmt.kw(sumB.coincident) : undefined} />
+        <Kpi label="Energy per year" value={`${fmt.int(sum.annualMwh)} MWh`} b={sumB ? `${fmt.int(sumB.annualMwh)} MWh` : undefined} />
+        <Kpi label="Equipment red / amber" value={`${sum.crit} / ${sum.warn}`} help="How many pieces of nearby grid equipment (transformers, street mains, vaults, map sheets, grid zones) your sites push over the amber or red line." b={sumB ? `${sumB.crit} / ${sumB.warn}` : undefined} />
+        <Kpi label="Estimated cost" value={fmt.usd(sum.cost)} sub={`grants ${fmt.usd(sum.incentive)} · you pay ${fmt.usd(sum.cost - sum.incentive)}`} b={sumB ? fmt.usd(sumB.cost) : undefined} />
+        <Kpi label="Sites in DACs" value={`${sum.dacSites} / ${scenario.sites.length}`} help="New York's climate law aims for at least 35 % of clean-energy benefits to reach disadvantaged communities." b={sumB ? `${sumB.dacSites} / ${compare!.sites.length}` : undefined} />
+        {area && <Kpi label={`EVs on the road (${area.year})`} value={fmt.int(area.totalEvs)} sub={`${fmt.pct(area.evShare, 1)} of ${fmt.int(area.totalVehicles)} cars`} b={compareArea ? `${fmt.int(compareArea.totalEvs)} (${compareArea.year})` : undefined} />}
+        {area && <Kpi label="Borough-wide extra load at rush hour" value={fmt.mw(area.totalAddedMw)} sub={`${area.networkStats.filter((n) => n.status === 'crit').length} grid zones in the red`} b={compareArea ? fmt.mw(compareArea.totalAddedMw) : undefined} />}
       </div>
 
       <div className="grid-2">
         <div className="card" id="tour-hourly">
           <h3>
             <span>
-              Hourly load profile <Help text="Stacked by site. Dashed red = the same sites with no managed charging or storage. Blue line = system peak hour used for status." />
+              Load through the day <Help text="Each site's hour-by-hour draw, stacked. Dashed red = the same sites without smart charging or batteries. Blue line = the grid's rush hour every light is judged on." />
             </span>
             <button className="btn small" onClick={() => downloadPng(charts.current.load, 'hourly_load')}>
               PNG
@@ -295,13 +295,13 @@ export function AnalyticsTab() {
         <div className="card" id="tour-assetchart">
           <h3>
             <span>
-              Asset loading at system peak <Help text="Added site load as a percentage of each asset's published headroom. Capped at 150% for display." />
+              How full each piece of equipment gets <Help text="Your sites' rush-hour load as a share of the room left on each piece of grid equipment. Bars are capped at 150 % so the chart stays readable." />
             </span>
             <button className="btn small" onClick={() => downloadPng(charts.current.assets, 'asset_loading')}>
               PNG
             </button>
           </h3>
-          {assetRows.length ? <Chart option={assetOpt} height={300} onReady={(c) => (charts.current.assets = c)} /> : <div className="empty">No assessed assets yet — zoom to a site on the map to load grid data.</div>}
+          {assetRows.length ? <Chart option={assetOpt} height={300} onReady={(c) => (charts.current.assets = c)} /> : <div className="empty">Nothing checked yet — zoom to a site on the map so the grid equipment loads.</div>}
         </div>
       </div>
 
@@ -314,16 +314,16 @@ export function AnalyticsTab() {
             <thead>
               <tr>
                 <th>Site</th>
-                <th>Profile</th>
-                <th className="num">Ports</th>
-                <th className="num">Nameplate</th>
-                <th className="num">Coincident</th>
-                <th className="num">Peak/NP</th>
+                <th>Kind of place</th>
+                <th className="num">Plugs</th>
+                <th className="num">Sticker</th>
+                <th className="num">At rush hour</th>
+                <th className="num">Rush / sticker</th>
                 <th className="num">MWh/yr</th>
                 <th>Status</th>
-                <th>Binding asset</th>
+                <th>Tightest spot</th>
                 <th className="num">Cost</th>
-                <th className="num">Incentive</th>
+                <th className="num">Grant</th>
                 <th>DAC</th>
                 <th></th>
               </tr>
@@ -380,7 +380,7 @@ export function AnalyticsTab() {
         <div className="card" id="tour-cost">
           <h3>
             <span>
-              Cost breakdown by site <Help text="Illustrative: port hardware + make-ready $/kW + storage + grid upgrades triggered by critical assets. Edit assumptions in Settings." />
+              Where the money goes <Help text="Rough numbers: chargers + wiring to the parking spot (make-ready) + battery + grid upgrades wherever a light is red. Change the prices in Settings." />
             </span>
             <button className="btn small" onClick={() => downloadPng(charts.current.cost, 'cost')}>
               PNG
@@ -391,7 +391,7 @@ export function AnalyticsTab() {
         <div className="card">
           <h3>
             <span>
-              EV adoption curves <Help text="Share of light-duty vehicles that are plug-in EVs. The bold line is the curve used by the area scenario; the marker is the scenario year." />
+              How fast cars go electric <Help text="Share of cars on the road that are electric, by year, under each assumption. The bold line is the one the borough-wide model uses; the marker is the chosen year." />
             </span>
             <button className="btn small" onClick={() => downloadPng(charts.current.adopt, 'adoption')}>
               PNG
@@ -407,7 +407,7 @@ export function AnalyticsTab() {
             <div className="card" id="tour-networkchart">
               <h3>
                 <span>
-                  Top networks by added EV load ({area.year}) <Help text="Coloured by status against the network's published hosting-capacity range (midpoint of 0–25 / 25–50 / 50–100 / >100 MW). Grey bars show that midpoint." />
+                  Grid zones gaining the most EV load ({area.year}) <Help text="Coloured by traffic light against the capacity range Con Edison publishes for each zone (we use the mid-point of 0–25 / 25–50 / 50–100 / 100+ MW). Grey bars show that mid-point." />
                 </span>
                 <button className="btn small" onClick={() => downloadPng(charts.current.net, 'networks')}>
                   PNG
@@ -417,7 +417,7 @@ export function AnalyticsTab() {
             </div>
             <div className="card">
               <h3>
-                <span>EVs and added load by borough</span>
+                <span>EVs and extra load by borough</span>
                 <button className="btn small" onClick={() => downloadPng(charts.current.boro, 'boroughs')}>
                   PNG
                 </button>
@@ -427,12 +427,12 @@ export function AnalyticsTab() {
           </div>
           <div className="card" id="tour-networktable">
             <h3>
-              <span>Network stress table</span>
+              <span>Grid zones: who needs work first</span>
               <span className="row">
                 <span className="muted">Sort:</span>
                 {(['ratio', 'addedMw', 'evs'] as const).map((k) => (
                   <button key={k} className={`btn small ${netSort === k ? 'active' : ''}`} onClick={() => setNetSort(k)}>
-                    {{ ratio: 'Ratio', addedMw: 'Added MW', evs: 'EVs' }[k]}
+                    {{ ratio: 'How full', addedMw: 'Extra MW', evs: 'EVs' }[k]}
                   </button>
                 ))}
               </span>
@@ -441,14 +441,14 @@ export function AnalyticsTab() {
               <table className="data">
                 <thead>
                   <tr>
-                    <th>Network</th>
+                    <th>Grid zone</th>
                     <th>Borough</th>
                     <th className="num">EVs</th>
-                    <th className="num">Added MW</th>
-                    <th>Capacity range MW</th>
-                    <th className="num">Plate kVA sum (MW)</th>
-                    <th className="num">LSRV remaining MW</th>
-                    <th className="num">Ratio</th>
+                    <th className="num">Extra MW</th>
+                    <th>Published capacity MW</th>
+                    <th className="num">Map-sheet room (MW)</th>
+                    <th className="num">Spare MW (LSRV)</th>
+                    <th className="num">How full</th>
                     <th>Status</th>
                     <th className="num">DAC share</th>
                     {compareArea && <th className="num">Compare MW</th>}

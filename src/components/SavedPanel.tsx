@@ -69,7 +69,7 @@ export function SavedPanel() {
       </div>
 
       <h3>
-        Saved scenarios <Help text="Saved in this browser (localStorage). Pick one as the comparison baseline to see side-by-side results in Analytics." />
+        Saved scenarios <Help text="Kept in this browser only. Pick one as the comparison to see it side by side with your current work in Analytics." />
       </h3>
       {!saved.length && <div className="muted">Nothing saved yet.</div>}
       {saved
