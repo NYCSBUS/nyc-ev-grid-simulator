@@ -441,7 +441,7 @@ h4 {
   position: relative;
   display: inline-flex;
 }
-.tt .tt-body {
+.tt-body {
   position: fixed;
   z-index: 1000;
   max-width: 280px;

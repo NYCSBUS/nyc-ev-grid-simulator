@@ -6,6 +6,8 @@ export type Season = 'summer' | 'winter';
 export type Status = 'ok' | 'warn' | 'crit' | 'unknown';
 
 export interface Site {
+  /** Optional cap on kW per plug by charger type (e.g. a managed-charging system limits 19.2 kW plugs to 10 kW). */
+  derateKw?: Partial<Record<ChargerType, number>>;
   id: string;
   name: string;
   lng: number;

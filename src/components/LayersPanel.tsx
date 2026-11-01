@@ -19,7 +19,7 @@ const LAYER_DEFS: Array<{ key: keyof LayerVisibility; label: string; help: strin
 ];
 
 const SITES_KEYS: Array<keyof LayerVisibility> = ['sites', 'transformers', 'feeders', 'structures', 'msplates', 'buildings', 'networks', 'dac', 'tracts', 'feeders33kv', 'nws'];
-const OUTLOOK_KEYS: Array<keyof LayerVisibility> = ['areaStress', 'dac', 'tracts', 'nws', 'sites'];
+const OUTLOOK_KEYS: Array<keyof LayerVisibility> = ['areaStress', 'dac', 'nws', 'sites'];
 
 export function LayersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
   const layers = useStore((s) => s.layers);
@@ -43,7 +43,7 @@ export function LayersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
   return (
     <div className="panel" id="tour-layers">
       <p className="muted" style={{ marginTop: 0 }}>
-        {mode === 'sites' ? 'Equipment layers stream in as you zoom in.' : 'Grid zones are always outlined in Outlook.'} Zoom: {zoom.toFixed(1)}
+        {mode === 'sites' ? 'Equipment layers stream in as you zoom in.' : 'Grid zones are always outlined here. The Sites map keeps its own layers.'} Zoom: {zoom.toFixed(1)}
       </p>
       <Check label="One layer at a time (less clutter)" checked={exclusive} onChange={setExclusive} help="When on, turning a layer on turns the others off, so you look at one thing at a time. Your sites always stay visible." />
       <div className="muted" style={{ fontSize: 11, margin: '2px 0 6px' }}>

@@ -7,9 +7,34 @@ import { readScenarioFromUrl } from './url';
 export type Tab = 'sites' | 'outlook' | 'results' | 'scenarios' | 'settings' | 'learn';
 /** Compact drawer over the map for layers / filters. */
 export type Drawer = 'layers' | 'filters' | null;
+export type MapMode = 'sites' | 'outlook';
+/** Everything that makes one map view feel like its own place: layers, filters, opacity and camera. */
+export interface MapUi {
+  layers: LayerVisibility;
+  filters: Filters;
+  layerOpacity: LayerOpacity;
+  camera: { center: [number, number]; zoom: number } | null;
+}
 
 const LS_SAVED = 'evsim.saved.v1';
-const LS_UI = 'evsim.ui.v3';
+const LS_UI = 'evsim.ui.v4';
+
+const OUTLOOK_LAYERS: LayerVisibility = { ...DEFAULT_LAYERS, transformers: false, feeders: false, buildings: false, networks: true, dac: true, areaStress: true, tracts: false };
+const DEFAULT_UI: Record<MapMode, MapUi> = {
+  sites: { layers: DEFAULT_LAYERS, filters: DEFAULT_FILTERS, layerOpacity: DEFAULT_OPACITY, camera: null },
+  outlook: { layers: OUTLOOK_LAYERS, filters: DEFAULT_FILTERS, layerOpacity: DEFAULT_OPACITY, camera: null },
+};
+function loadUi(): Record<MapMode, MapUi> {
+  const raw = load<Partial<Record<MapMode, Partial<MapUi>>>>(LS_UI, {});
+  const merge = (m: MapMode): MapUi => ({
+    layers: { ...DEFAULT_UI[m].layers, ...(raw[m]?.layers ?? {}) },
+    filters: { ...DEFAULT_UI[m].filters, ...(raw[m]?.filters ?? {}) },
+    layerOpacity: { ...DEFAULT_UI[m].layerOpacity, ...(raw[m]?.layerOpacity ?? {}) },
+    camera: raw[m]?.camera ?? null,
+  });
+  return { sites: merge('sites'), outlook: merge('outlook') };
+}
+const UI0 = loadUi();
 const LS_ACTIVE = 'evsim.active.v1';
 const LS_MISSIONS = 'evsim.missions.v1';
 
@@ -57,6 +82,10 @@ export interface AppState {
   saved: Scenario[];
   compareId: string | null;
   tab: Tab;
+  /** Which map experience is live (Sites or Outlook); the two keep separate layers, filters and cameras. */
+  mapMode: MapMode;
+  /** Saved UI for the map mode that is *not* currently active. */
+  stash: Record<MapMode, MapUi>;
   drawer: Drawer;
   learnView: 'guide' | 'missions';
   selectedSiteId: string | null;
@@ -125,16 +154,18 @@ export const useStore = create<AppState>((set, get) => ({
   saved: loadList<Scenario>(LS_SAVED),
   compareId: null,
   tab: 'sites',
+  mapMode: 'sites',
+  stash: UI0,
   drawer: null,
   learnView: 'guide',
   selectedSiteId: null,
   placing: false,
   tourRequested: false,
   sidebarOpen: true,
-  layers: load(LS_UI, { layers: DEFAULT_LAYERS, filters: DEFAULT_FILTERS, layerOpacity: DEFAULT_OPACITY, exclusiveLayers: false }).layers,
-  layerOpacity: { ...DEFAULT_OPACITY, ...load(LS_UI, { layerOpacity: {} as LayerOpacity }).layerOpacity },
-  exclusiveLayers: load(LS_UI, { exclusiveLayers: false }).exclusiveLayers,
-  filters: load(LS_UI, { layers: DEFAULT_LAYERS, filters: DEFAULT_FILTERS }).filters,
+  layers: UI0.sites.layers,
+  layerOpacity: UI0.sites.layerOpacity,
+  exclusiveLayers: load<{ exclusiveLayers: boolean }>(LS_UI, { exclusiveLayers: false }).exclusiveLayers,
+  filters: UI0.sites.filters,
   staticData: {},
   live: { transformers: emptyFC(), feeders: emptyFC(), structures: emptyFC(), buildings: emptyFC(), feeders33kv: emptyFC(), loading: {}, errors: {} },
   viewport: { center: [-73.9, 40.75], zoom: 11 },
@@ -144,15 +175,22 @@ export const useStore = create<AppState>((set, get) => ({
   toast: null,
 
   setTab: (tab) =>
-    set((s) => ({
-      tab,
-      drawer: null,
-      analyticsVisited: s.analyticsVisited || tab === 'results',
-      // the Outlook tab *is* the borough-wide model, so switch it on when the user goes there
-      scenario: tab === 'outlook' && !s.scenario.area.enabled ? { ...s.scenario, area: { ...s.scenario.area, enabled: true } } : s.scenario,
-      // Outlook is a borough-scale view: zoom out if the user arrives from street level
-      flyTo: tab === 'outlook' && s.viewport.zoom > 12.5 ? { center: [-73.93, 40.78], zoom: 10.6, nonce: Date.now() } : s.flyTo,
-    })),
+    set((s) => {
+      const base: Partial<AppState> = {
+        tab,
+        drawer: null,
+        analyticsVisited: s.analyticsVisited || tab === 'results',
+        // the Outlook tab *is* the borough-wide model, so switch it on when the user goes there
+        scenario: tab === 'outlook' && !s.scenario.area.enabled ? { ...s.scenario, area: { ...s.scenario.area, enabled: true } } : s.scenario,
+      };
+      const to: MapMode | null = tab === 'sites' || tab === 'outlook' ? tab : null;
+      if (!to || to === s.mapMode) return base;
+      // Swap map experiences: park the current mode's layers/filters/camera, bring out the other's
+      const stash = { ...s.stash, [s.mapMode]: { layers: s.layers, filters: s.filters, layerOpacity: s.layerOpacity, camera: s.viewport } };
+      const next = stash[to];
+      const camera = next.camera ?? (to === 'outlook' ? { center: [-73.93, 40.78] as [number, number], zoom: 10.6 } : s.viewport);
+      return { ...base, mapMode: to, stash, layers: next.layers, filters: next.filters, layerOpacity: next.layerOpacity, flyTo: { ...camera, nonce: Date.now() } };
+    }),
   setDrawer: (drawer) => set({ drawer }),
   setLearnView: (learnView) => set({ learnView }),
   setSidebarOpen: (sidebarOpen) => set({ sidebarOpen }),
@@ -171,7 +209,7 @@ export const useStore = create<AppState>((set, get) => ({
   setLayerOpacity: (key, v) => set((s) => ({ layerOpacity: { ...s.layerOpacity, [key]: v } })),
   setExclusiveLayers: (exclusiveLayers) => set({ exclusiveLayers }),
   setFilters: (patch) => set((s) => ({ filters: { ...s.filters, ...patch } })),
-  resetFilters: () => set({ filters: DEFAULT_FILTERS }),
+  resetFilters: () => set((s) => ({ filters: DEFAULT_UI[s.mapMode].filters })),
   saveScenario: (name) => {
     const s = get().scenario;
     const snapshot: Scenario = { ...structuredClone(s), name: name ?? s.name, createdAt: Date.now() };
@@ -204,8 +242,10 @@ export const useStore = create<AppState>((set, get) => ({
 // Persist slices
 useStore.subscribe((s, prev) => {
   if (s.saved !== prev.saved) localStorage.setItem(LS_SAVED, JSON.stringify(s.saved));
-  if (s.layers !== prev.layers || s.filters !== prev.filters || s.layerOpacity !== prev.layerOpacity || s.exclusiveLayers !== prev.exclusiveLayers)
-    localStorage.setItem(LS_UI, JSON.stringify({ layers: s.layers, filters: s.filters, layerOpacity: s.layerOpacity, exclusiveLayers: s.exclusiveLayers }));
+  if (s.layers !== prev.layers || s.filters !== prev.filters || s.layerOpacity !== prev.layerOpacity || s.exclusiveLayers !== prev.exclusiveLayers || s.stash !== prev.stash) {
+    const ui = { ...s.stash, [s.mapMode]: { layers: s.layers, filters: s.filters, layerOpacity: s.layerOpacity, camera: s.stash[s.mapMode].camera } };
+    localStorage.setItem(LS_UI, JSON.stringify({ ...ui, exclusiveLayers: s.exclusiveLayers }));
+  }
   if (s.scenario !== prev.scenario) localStorage.setItem(LS_ACTIVE, JSON.stringify(s.scenario));
   if (s.missionsDone !== prev.missionsDone) localStorage.setItem(LS_MISSIONS, JSON.stringify(s.missionsDone));
 });

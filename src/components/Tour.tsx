@@ -356,8 +356,11 @@ function runTour(onDone: () => void): { cancel: () => void } {
   const prev = structuredClone(S().scenario);
   const prevLayers = { ...S().layers };
   const prevFilters = { ...S().filters };
+  const prevStash = S().stash;
+  const prevMode = S().mapMode;
 
-  // start from a clean walkthrough scenario
+  // start from a clean walkthrough scenario, on the Sites map
+  S().setTab('sites');
   S().importScenario({ id: uid(), name: TOUR_NAME, sites: [], area: structuredClone(DEFAULT_AREA), settings: structuredClone(DEFAULT_SETTINGS), createdAt: Date.now() });
   S().setFilters(DEFAULT_FILTERS);
   S().setLayers({ transformers: true, feeders: true, buildings: true, networks: true, dac: true, tracts: false, sites: true, areaStress: true });
@@ -414,9 +417,16 @@ function runTour(onDone: () => void): { cancel: () => void } {
       const tourScenario: Scenario = { ...structuredClone(st.scenario), name: TOUR_NAME, createdAt: Date.now() };
       useStore.setState({ saved: [...st.saved.filter((x) => x.name !== TOUR_NAME), tourScenario] });
       st.importScenario(prev);
-      st.setLayers(prevLayers);
-      st.setFilters(prevFilters);
       st.setTab('sites');
+      // put both map experiences back exactly as the user had them
+      useStore.setState({ stash: prevStash });
+      if (prevMode === 'sites') {
+        st.setLayers(prevLayers);
+        st.setFilters(prevFilters);
+      } else {
+        st.setLayers(prevStash.sites.layers);
+        st.setFilters(prevStash.sites.filters);
+      }
       st.setDrawer(null);
       st.setToast('Tour finished — your scenario is back; the walkthrough is kept under Saved');
       onDone();
@@ -436,8 +446,10 @@ function runTour(onDone: () => void): { cancel: () => void } {
       else if (!started) {
         // never shown: restore silently
         S().importScenario(prev);
-        S().setLayers(prevLayers);
-        S().setFilters(prevFilters);
+        S().setTab('sites');
+        useStore.setState({ stash: prevStash });
+        S().setLayers(prevMode === 'sites' ? prevLayers : prevStash.sites.layers);
+        S().setFilters(prevMode === 'sites' ? prevFilters : prevStash.sites.filters);
       }
     },
   };

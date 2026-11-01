@@ -16,6 +16,17 @@ export function nameplateKw(site: Site): number {
   return (Object.keys(site.chargers) as Array<keyof typeof CHARGERS>).reduce((s, k) => s + (site.chargers[k] || 0) * CHARGERS[k].kw, 0);
 }
 
+/** kW one plug of this type can actually deliver here: the hardware rating, or the user's cap if lower. */
+export function plugKw(site: Site, k: keyof typeof CHARGERS): number {
+  const cap = site.derateKw?.[k];
+  return cap != null && cap > 0 ? Math.min(CHARGERS[k].kw, cap) : CHARGERS[k].kw;
+}
+
+/** Rating after any per-plug caps — what the load model actually uses. */
+export function effectiveKw(site: Site): number {
+  return (Object.keys(site.chargers) as Array<keyof typeof CHARGERS>).reduce((s, k) => s + (site.chargers[k] || 0) * plugKw(site, k), 0);
+}
+
 export function portCount(site: Site): number {
   return Object.values(site.chargers).reduce((s, n) => s + (n || 0), 0);
 }
@@ -37,7 +48,7 @@ export function applyStorage(hourly: number[], kw: number, kwh: number): number[
 }
 
 export function siteHourly(site: Site, managedOverride?: boolean): { hourly: number[]; unmanaged: number[] } {
-  const np = nameplateKw(site);
+  const np = effectiveKw(site);
   const factor = site.utilization * site.diversity;
   const prof = PROFILES[site.profile];
   const managed = managedOverride ?? site.managed;
@@ -254,7 +265,7 @@ export function assessSite(site: Site, ctx: SiteContext, settings: Settings): Si
 export function estimateCost(site: Site, assets: AssetStatus[], inDac: boolean, settings: Settings): CostBreakdown {
   const c = settings.cost;
   const chargers = (Object.keys(site.chargers) as Array<keyof typeof CHARGERS>).reduce((s, k) => s + (site.chargers[k] || 0) * c.portCost[k], 0);
-  const np = nameplateKw(site);
+  const np = effectiveKw(site); // the service is sized to what the plugs can actually draw
   const makeReady = np * c.makeReadyPerKw;
   const storage = site.storageKwh * c.storagePerKwh;
   let gridUpgrades = 0;

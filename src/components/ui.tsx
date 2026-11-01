@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { Status } from '../types';
 
 /** Hover tooltip. Wrap any element; `text` shows in a fixed-position bubble. */
@@ -14,17 +15,19 @@ export function Tip({ text, children }: { text: ReactNode; children: ReactNode }
       onMouseLeave={() => setPos(null)}
     >
       {children}
-      {pos && (
-        <span
-          className="tt-body"
-          style={{
-            left: Math.min(Math.max(8, pos.x - 140), window.innerWidth - 290),
-            top: pos.y > window.innerHeight - 120 ? pos.y - 110 : pos.y,
-          }}
-        >
-          {text}
-        </span>
-      )}
+      {pos &&
+        createPortal(
+          <span
+            className="tt-body"
+            style={{
+              left: Math.min(Math.max(8, pos.x - 140), window.innerWidth - 290),
+              top: pos.y > window.innerHeight - 120 ? pos.y - 110 : pos.y,
+            }}
+          >
+            {text}
+          </span>,
+          document.body,
+        )}
     </span>
   );
 }

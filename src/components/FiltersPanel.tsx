@@ -48,6 +48,8 @@ export function FiltersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
         </>
       )}
 
+      {mode === 'sites' && (
+      <>
       <h3>
         Neighbourhood statistics <Help text="Shade every Census neighbourhood by one statistic — income, renters, car ownership and so on. Turns the neighbourhood layer on." />
       </h3>
@@ -61,6 +63,9 @@ export function FiltersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
         }}
         help={filters.acsVariable !== 'none' ? ACS_VARS[filters.acsVariable].help : 'Pick a statistic to see what it means.'}
       />
+      </>
+      )}
+      {mode === 'outlook' && <h3>Neighbourhoods</h3>}
       <Check label="Disadvantaged communities only" checked={filters.dacOnly} onChange={(dacOnly) => setFilters({ dacOnly })} />
 
       {mode === 'sites' && (

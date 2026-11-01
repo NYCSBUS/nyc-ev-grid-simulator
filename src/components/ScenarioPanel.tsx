@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useStore } from '../state/store';
 import { useAssessments, useAreaResult } from '../state/hooks';
 import { CHARGERS, CURVE_LABELS, PROFILES, evShare } from '../sim/profiles';
-import { nameplateKw, portCount } from '../sim/model';
+import { effectiveKw, nameplateKw, plugKw, portCount } from '../sim/model';
 import type { ChargerType, Site, SiteAssessment } from '../types';
 import { Check, Chips, Help, Select, Slider, StatusDot, StatusPill, Tip, fmt } from './ui';
 import { kwPerEv } from '../sim/area';
@@ -170,6 +170,46 @@ function SiteEditor({ site }: { site: Site }) {
         <span className="muted">Sticker rating (nameplate)</span>
         <b>{fmt.kw(nameplateKw(site))}</b>
       </div>
+      {effectiveKw(site) < nameplateKw(site) - 0.01 && (
+        <div className="row between">
+          <span className="muted">After per-plug caps</span>
+          <b style={{ color: 'var(--accent)' }}>{fmt.kw(effectiveKw(site))}</b>
+        </div>
+      )}
+      <Fold title="Cap each plug (derating)" defaultOpen={!!site.derateKw && Object.values(site.derateKw).some((v) => v)}>
+        <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+          Some charging systems hold plugs below their hardware rating — e.g. 19.2 kW plugs limited to 10 kW. Enter the cap per plug; leave blank for full power.
+        </div>
+        {(Object.keys(CHARGERS) as ChargerType[])
+          .filter((k) => (site.chargers[k] || 0) > 0)
+          .map((k) => (
+            <div key={k} className="field">
+              <label>
+                {CHARGERS[k].label}
+                <span className="muted" style={{ fontSize: 11 }}>→ {plugKw(site, k)} kW each</span>
+              </label>
+              <span className="row" style={{ gap: 4 }}>
+                <input
+                  type="number"
+                  min={0}
+                  max={CHARGERS[k].kw}
+                  step={0.5}
+                  placeholder={String(CHARGERS[k].kw)}
+                  value={site.derateKw?.[k] ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value === '' ? undefined : Math.max(0, +e.target.value);
+                    const next = { ...(site.derateKw ?? {}) };
+                    if (v == null || v <= 0) delete next[k];
+                    else next[k] = v;
+                    set({ derateKw: next });
+                  }}
+                />
+                <span className="muted">kW</span>
+              </span>
+            </div>
+          ))}
+        {portCount(site) === 0 && <div className="muted">Add some plugs first.</div>}
+      </Fold>
 
       <Select
         label="What kind of place"

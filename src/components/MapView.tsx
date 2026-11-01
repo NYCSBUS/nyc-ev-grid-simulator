@@ -157,11 +157,13 @@ export function MapView() {
   const rawLayers = useStore((s) => s.layers);
   const layerOpacity = useStore((s) => s.layerOpacity);
   const filters = useStore((s) => s.filters);
-  const tab = useStore((s) => s.tab);
+  const mapMode = useStore((s) => s.mapMode);
   const drawer = useStore((s) => s.drawer);
   const setDrawer = useStore((s) => s.setDrawer);
   const selectedSiteIdForHint = useStore((s) => s.selectedSiteId);
-  const mode: 'sites' | 'outlook' = tab === 'outlook' ? 'outlook' : 'sites';
+  const mode: 'sites' | 'outlook' = mapMode;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
   // Each map mode shows only what it needs: Sites = equipment around sites; Outlook = heat map + grid zones.
   const layers = useMemo<LayerVisibility>(
     () =>
@@ -471,10 +473,16 @@ export function MapView() {
         if (!site.address) reverseGeocode(site.lng, site.lat).then((a) => a && updateSite(site.id, { address: a, name: a.split(',')[0] }));
         return;
       }
-      const feats = map.queryRenderedFeatures(e.point, { layers: interactive.filter((l) => map.getLayer(l)) });
+      let feats = map.queryRenderedFeatures(e.point, { layers: interactive.filter((l) => map.getLayer(l)) });
       if (!feats.length) {
         popup.remove();
         return;
+      }
+      // In Outlook the grid-zone fill is drawn on top of the neighbourhoods; the user is usually after the neighbourhood.
+      if (modeRef.current === 'outlook') {
+        const prio = ['sites-circle', 'tracts-fill', 'networks-fill', 'dac-fill'];
+        const rank = (id: string) => { const i = prio.indexOf(id); return i < 0 ? prio.length : i; };
+        feats = feats.slice().sort((a, b) => rank(a.layer?.id ?? '') - rank(b.layer?.id ?? ''));
       }
       const f = feats[0];
       const p = f.properties ?? {};
