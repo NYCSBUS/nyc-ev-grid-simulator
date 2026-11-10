@@ -1,7 +1,8 @@
 import type { AssetStatus, SiteAssessment, Status } from '../types';
 import { fmt } from '../components/ui';
 
-export type VerdictLevel = 'fits' | 'tight' | 'nofit' | 'unknown';
+/** `unknown` = still loading the grid around the site; `nodata` = loaded, but nothing published nearby. */
+export type VerdictLevel = 'fits' | 'tight' | 'nofit' | 'unknown' | 'nodata';
 
 export interface Verdict {
   level: VerdictLevel;
@@ -16,7 +17,8 @@ export interface Verdict {
   tightest?: AssetStatus;
 }
 
-export const VERDICT_WORD: Record<VerdictLevel, string> = { fits: 'Fits', tight: 'Tight', nofit: "Doesn't fit", unknown: 'Checking…' };
+/** The one vocabulary for a light, used on cards, pills, tables and the legend. */
+export const VERDICT_WORD: Record<VerdictLevel, string> = { fits: 'Fits', tight: 'Tight', nofit: "Doesn't fit", unknown: 'Checking…', nodata: 'No data' };
 
 /** Plain-English name for an asset kind. */
 export function friendlyAsset(a: { kind: string; name: string }) {
@@ -34,33 +36,55 @@ export function friendlyAsset(a: { kind: string; name: string }) {
   }
 }
 
-export function verdictFor(a?: SiteAssessment, loading = false): Verdict {
+/** "62% of its 350 kW room" / "25 times its 24 kW room" — the same wording wherever a tightest spot is described. */
+export function roomPhrase(a: AssetStatus) {
+  const r = a.ratio ?? 0;
+  return r >= 10 ? `${Math.round(r)} times its ${fmt.kw(a.headroomKw)} room` : `${fmt.pct(r)} of its ${fmt.kw(a.headroomKw)} room`;
+}
+
+/**
+ * @param loading live grid layers are being fetched right now
+ * @param failed  the last fetch of the grid layers errored
+ */
+export function verdictFor(a?: SiteAssessment, loading = false, failed = false): Verdict {
   const live = (a?.assets ?? []).filter((x) => x.ratio != null);
   const counts = {
     ok: live.filter((x) => x.status === 'ok').length,
     warn: live.filter((x) => x.status === 'warn').length,
     crit: live.filter((x) => x.status === 'crit').length,
   };
-  if (!a || !live.length) {
+  // Never show a colour before the equipment around the site has arrived: a verdict from partial data is a guess.
+  if (!a || a.provisional) {
+    const stuck = failed && !loading;
     return {
       level: 'unknown',
       status: 'unknown',
-      title: loading || !a ? 'Checking the grid…' : 'No grid data here',
-      summary: loading || !a ? 'Loading Con Edison equipment around this site.' : 'No equipment with published room inside the search circle. Try a wider circle in More options.',
+      title: stuck ? "Couldn't load the grid data" : 'Checking the grid…',
+      summary: stuck ? "Con Edison's map service didn't answer, so there is no verdict yet. Nudge the map or reload the page to try again." : 'Loading Con Edison equipment around this site.',
+      advice: '',
+      counts: { ok: 0, warn: 0, crit: 0 },
+    };
+  }
+  if (!live.length) {
+    return {
+      level: 'nodata',
+      status: 'unknown',
+      title: 'No grid data here',
+      summary: 'No equipment with published room inside the search circle. Try a wider circle in More options.',
       advice: '',
       counts,
     };
   }
   const tightest = live.slice().sort((x, y) => (y.ratio ?? 0) - (x.ratio ?? 0))[0];
   const n = live.length;
-  const where = `${friendlyAsset(tightest)} (${fmt.pct(Math.min(tightest.ratio!, 9.99))} of its ${fmt.kw(tightest.headroomKw)} room)`;
+  const where = `${friendlyAsset(tightest)} (${roomPhrase(tightest)})`;
   if (a.worst === 'crit') {
     return {
       level: 'nofit',
       status: 'crit',
       title: "Doesn't fit as designed",
       summary: `${fmt.kw(a.coincidentKw)} at the 5 PM rush overfills ${counts.crit} of ${n} nearby pieces of equipment. Tightest: ${where}.`,
-      advice: 'Try fewer fast plugs, smart charging or a battery — or drag the pin toward a green dot with a white ring.',
+      advice: 'Try fewer fast plugs, smart charging or a battery — or drag the pin toward a pale-blue dot with a white ring (a roomy 460 V tap).',
       counts,
       tightest,
     };

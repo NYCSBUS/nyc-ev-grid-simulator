@@ -3,7 +3,7 @@ import { useStore } from './store';
 import { DATA_BASE, LIVE_LAYERS, MIN_ZOOM } from '../config';
 import { queryArcGISBBox, type BBox } from '../lib/arcgis';
 import { fetchBuildings } from '../lib/socrata';
-import { assessSite, type SiteContext } from '../sim/model';
+import { assessSite, coverKey, type SiteContext } from '../sim/model';
 import { buildAreaIndex, runArea, type AreaIndex } from '../sim/area';
 import type { AreaResult, Scenario, SiteAssessment } from '../types';
 
@@ -47,7 +47,10 @@ export function useLiveData() {
   const viewport = useStore((s) => s.viewport);
   const layers = useStore((s) => s.layers);
   const season = useStore((s) => s.scenario.settings.season);
-  const sites = useStore((s) => s.scenario.sites);
+  const ownSites = useStore((s) => s.scenario.sites);
+  // the scenario being compared in Results needs its surroundings loaded too, or its lights would be guesses
+  const compareSites = useStore((s) => (s.compareId ? s.saved.find((x) => x.id === s.compareId)?.sites : undefined));
+  const sites = useMemo(() => (compareSites ? [...ownSites, ...compareSites] : ownSites), [ownSites, compareSites]);
   const setLive = useStore((s) => s.setLive);
   const timer = useRef<number>();
   const abort = useRef<AbortController>();
@@ -61,7 +64,11 @@ export function useLiveData() {
       const { center, zoom } = viewport;
       const vb = pad(bboxFromViewport(center, zoom));
       const setLoading = (k: string, v: boolean) => setLive({ loading: { ...useStore.getState().live.loading, [k]: v } });
-      const setError = (k: string, v?: string) => setLive({ errors: { ...useStore.getState().live.errors, [k]: v } });
+      const setError = (k: string, v?: string) => {
+        if (v) failed = true;
+        setLive({ errors: { ...useStore.getState().live.errors, [k]: v } });
+      };
+      let failed = false;
 
       // Always fetch assets around sites so assessments work regardless of viewport
       const siteBoxes: BBox[] = sites.map((s) => {
@@ -143,6 +150,9 @@ export function useLiveData() {
         }
       }
 
+      // Everything a site verdict depends on has now been asked for: mark these sites as checked.
+      if (!ctl.signal.aborted && !failed) setLive({ covered: [...new Set(sites.map((s) => coverKey(s, season)))] });
+
       // 33 kV feeders
       if (layers.feeders33kv && zoom >= MIN_ZOOM.feeders33kv) {
         setLoading('feeders33kv', true);
@@ -190,14 +200,20 @@ export function useSiteContext(): SiteContext | null {
       networks: st.networks,
       tracts: st.tracts,
       structures: live.structures.features.length ? live.structures : undefined,
+      covered: live.covered,
     };
-  }, [st.networks, st.plates, st.tracts, live.transformers, live.feeders, live.structures]);
+  }, [st.networks, st.plates, st.tracts, live.transformers, live.feeders, live.structures, live.covered]);
 }
 
 export function assessScenario(sc: Scenario, ctx: SiteContext | null): Map<string, SiteAssessment> {
   const m = new Map<string, SiteAssessment>();
   if (!ctx) return m;
-  for (const s of sc.sites) m.set(s.id, assessSite(s, ctx, sc.settings));
+  for (const s of sc.sites) {
+    const a = assessSite(s, ctx, sc.settings);
+    // Until the equipment around the site has loaded, any verdict would be a guess from partial data — hold it back.
+    const provisional = !!ctx.covered && !ctx.covered.includes(coverKey(s, sc.settings.season));
+    m.set(s.id, provisional ? { ...a, provisional: true, worst: 'unknown' } : a);
+  }
   return m;
 }
 
@@ -228,10 +244,12 @@ export function useAreaResult(scenario?: Scenario): AreaResult | null {
 
 export function useToastAutoClear() {
   const toast = useStore((s) => s.toast);
+  const undoable = useStore((s) => !!s.undo && s.undo.label === s.toast);
   const setToast = useStore((s) => s.setToast);
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3200);
+    // leave time to reach the Undo button
+    const t = setTimeout(() => setToast(null), undoable ? 8000 : 3200);
     return () => clearTimeout(t);
-  }, [toast, setToast]);
+  }, [toast, undoable, setToast]);
 }

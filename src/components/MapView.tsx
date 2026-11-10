@@ -24,7 +24,7 @@ const EMPTY: FC = { type: 'FeatureCollection', features: [] };
 export const ACS_VARS: Record<AcsVariable, { label: string; fmt: (v: number) => string; ramp: string[]; help: string }> = {
   none: { label: 'None', fmt: String, ramp: [], help: '' },
   density: { label: 'Population density', fmt: (v) => `${fmt.int(v)} /km²`, ramp: ['#1e293b', '#0ea5e9', '#f0abfc'], help: 'How crowded the neighbourhood is: people per square kilometre (Census ACS).' },
-  mhi: { label: 'Median household income', fmt: (v) => `$${fmt.int(v)}`, ramp: ['#7f1d1d', '#f59e0b', '#22c55e'], help: 'Typical household income in the neighbourhood (Census ACS).' },
+  mhi: { label: 'Median household income', fmt: (v) => `$${fmt.int(v)}`, ramp: ['#1e293b', '#0d9488', '#99f6e4'], help: 'Typical household income in the neighbourhood (Census ACS).' },
   renter_share: { label: 'Renters', fmt: (v) => fmt.pct(v), ramp: ['#1e293b', '#a855f7'], help: 'Share of homes that are rented. Renters rarely have a driveway or garage to charge in, so they depend on public or building chargers.' },
   veh_per_hh: { label: 'Vehicles per household', fmt: (v) => v.toFixed(2), ramp: ['#1e293b', '#fb923c'], help: 'Average cars per household. More cars today means more EVs later in the borough-wide model.' },
   no_veh_share: { label: 'Households with no car', fmt: (v) => fmt.pct(v), ramp: ['#1e293b', '#38bdf8'], help: 'Share of households that own no car at all. High in transit-rich, apartment-heavy areas — a sign that shared chargers matter more than home ones.' },
@@ -54,47 +54,46 @@ function rampExpr(prop: string, stops: number[], colors: string[]): any {
   return out;
 }
 
-const XFMR_COLOR: any = [
-  'match',
-  ['get', 'CapacityRange'],
-  '< 200 kVA',
-  '#ef4444',
-  '200 kVA to 499 kVA',
-  '#f59e0b',
-  '500 kVA to 1000 kVA',
-  '#84cc16',
-  '> 1000 kVA',
-  '#22c55e',
-  '#64748b',
-];
+/**
+ * "Room left" on a piece of equipment, least → most. A cool single-direction scale (dull violet → pale cyan) on purpose:
+ * green / amber / red is reserved for the traffic lights — what *your site* does to that equipment.
+ */
+export const ROOM_COLORS = ['#7c5cc4', '#6f8cf0', '#38bdf8', '#b6f3ff'] as const;
+const ROOM_UNKNOWN = '#64748b';
+/** Borough-wide growth per neighbourhood, low → high. Purple, so it cannot be mistaken for a traffic light. */
+export const GROWTH_RAMP = ['#3b1d6e', '#6d28d9', '#a855f7', '#e879f9', '#fde7ff'] as const;
 
-const FEEDER_COLOR: any = [
+const XFMR_COLOR: any = ['match', ['get', 'CapacityRange'], '< 200 kVA', ROOM_COLORS[0], '200 kVA to 499 kVA', ROOM_COLORS[1], '500 kVA to 1000 kVA', ROOM_COLORS[2], '> 1000 kVA', ROOM_COLORS[3], ROOM_UNKNOWN];
+
+const roomStep = (prop: string, stops: [number, number, number], toNumber = false): any => [
   'step',
-  ['coalesce', ['to-number', ['get', 'EV_HEADROOM']], -1],
-  '#64748b',
+  ['coalesce', toNumber ? ['to-number', ['get', prop]] : ['get', prop], -1],
+  ROOM_UNKNOWN,
   0,
-  '#ef4444',
-  0.5,
-  '#f59e0b',
-  2,
-  '#84cc16',
-  5,
-  '#22c55e',
+  ROOM_COLORS[0],
+  stops[0],
+  ROOM_COLORS[1],
+  stops[1],
+  ROOM_COLORS[2],
+  stops[2],
+  ROOM_COLORS[3],
 ];
+const FEEDER_COLOR: any = roomStep('EV_HEADROOM', [0.5, 2, 5], true);
 
 const LANDUSE_COLOR: any = [
   'match',
   ['get', 'landuse'],
+  // earthy tones for homes, rose for shops: amber / red / green are left to the traffic lights
   '01',
-  '#fde68a',
+  '#e9dcb8',
   '02',
-  '#fbbf24',
+  '#d9bf8f',
   '03',
-  '#f59e0b',
+  '#c8a27a',
   '04',
-  '#fb923c',
+  '#b98a8a',
   '05',
-  '#f87171',
+  '#d98fb0',
   '06',
   '#a78bfa',
   '07',
@@ -102,7 +101,7 @@ const LANDUSE_COLOR: any = [
   '08',
   '#60a5fa',
   '09',
-  '#4ade80',
+  '#86b89a',
   '10',
   '#e879f9',
   '11',
@@ -187,6 +186,13 @@ export function MapView() {
   const thresholds = useStore((s) => s.scenario.settings.thresholds);
   const assessments = useAssessments();
   const area = useAreaResult();
+  // popups are built inside a long-lived click handler, so read the latest outlook result through a ref
+  const areaRef = useRef(area);
+  areaRef.current = area;
+  const areaBoroughs = useStore((s) => s.scenario.area.boroughs);
+  const areaDacOnly = useStore((s) => s.scenario.area.dacOnly);
+  /** A site pin being dragged: drawn at the pointer until it is dropped. */
+  const [drag, setDrag] = useState<{ id: string; lng: number; lat: number } | null>(null);
 
   const placingRef = useRef(placing);
   placingRef.current = placing;
@@ -296,7 +302,7 @@ export function MapView() {
         type: 'fill',
         source: 'msplates',
         paint: {
-          'fill-color': ['step', ['coalesce', ['get', 'KVA'], -1], '#64748b', 0, '#ef4444', 500, '#f59e0b', 2000, '#84cc16', 5000, '#22c55e'],
+          'fill-color': roomStep('KVA', [500, 2000, 5000]),
           'fill-opacity': 0.35,
         },
       });
@@ -331,7 +337,7 @@ export function MapView() {
         source: 'structures',
         paint: {
           'circle-radius': 3.5,
-          'circle-color': ['step', ['coalesce', ['get', 'KVA'], -1], '#64748b', 0, '#ef4444', 100, '#f59e0b', 300, '#84cc16', 600, '#22c55e'],
+          'circle-color': roomStep('KVA', [100, 300, 600]),
           'circle-stroke-color': '#0f1419',
           'circle-stroke-width': 0.8,
         },
@@ -458,6 +464,54 @@ export function MapView() {
       map.on('mouseleave', id, () => (map.getCanvas().style.cursor = placingRef.current ? 'crosshair' : ''));
     }
 
+    // ---------- drag a site pin to move it ----------
+    // The pin follows the pointer; the site itself moves once, on drop, so the grid is re-checked once.
+    let dragging: { id: string; moved: boolean } | null = null;
+    const onDragMove = (e: mapboxgl.MapMouseEvent | mapboxgl.MapTouchEvent) => {
+      if (!dragging) return;
+      dragging.moved = true;
+      setDrag({ id: dragging.id, lng: e.lngLat.lng, lat: e.lngLat.lat });
+    };
+    const stopDrag = () => {
+      map.off('mousemove', onDragMove);
+      map.off('touchmove', onDragMove);
+      map.getCanvas().style.cursor = '';
+      const d = dragging;
+      dragging = null;
+      setDrag(null);
+      return d;
+    };
+    const onDragEnd = (e: mapboxgl.MapMouseEvent | mapboxgl.MapTouchEvent) => {
+      const d = stopDrag();
+      if (!d?.moved) return;
+      const { lng, lat } = e.lngLat;
+      useStore.getState().moveSite(d.id, lng, lat);
+      reverseGeocode(lng, lat).then((a) => a && useStore.getState().updateSite(d.id, { address: a }));
+    };
+    const onDragStart = (e: (mapboxgl.MapMouseEvent | mapboxgl.MapTouchEvent) & { features?: mapboxgl.GeoJSONFeature[] }) => {
+      if (placingRef.current || modeRef.current !== 'sites') return;
+      if ('touches' in e.originalEvent && e.originalEvent.touches.length > 1) return; // leave pinch-zoom alone
+      const id = e.features?.[0]?.properties?.id;
+      if (!id) return;
+      e.preventDefault(); // keep the map from panning
+      dragging = { id: String(id), moved: false };
+      map.getCanvas().style.cursor = 'grabbing';
+      if (e.type === 'touchstart') {
+        map.on('touchmove', onDragMove);
+        map.once('touchend', onDragEnd);
+      } else {
+        map.on('mousemove', onDragMove);
+        map.once('mouseup', onDragEnd);
+        // released outside the map: put the pin back
+        window.addEventListener('mouseup', () => dragging && stopDrag(), { once: true });
+      }
+    };
+    map.on('mousedown', 'sites-circle', onDragStart);
+    map.on('touchstart', 'sites-circle', onDragStart);
+    map.on('mouseenter', 'sites-circle', () => {
+      if (!placingRef.current && !dragging && modeRef.current === 'sites') map.getCanvas().style.cursor = 'grab';
+    });
+
     map.on('click', async (e) => {
       const st = useStore.getState();
       if (placingRef.current) {
@@ -549,22 +603,22 @@ export function MapView() {
           ]);
           break;
         case 'networks-fill': {
-          const ns = area?.networkStats.find((n) => n.network === p.NETWORK);
+          const ns = areaRef.current?.networkStats.find((n) => n.network === p.NETWORK);
           html = popupHtml(`${p.NETWORK} grid zone`, [
             ['Borough', p.BOROUGH],
             ['Published capacity', p.CapacityRange ? `${p.CapacityRange} MW` : '—'],
             ['Load-relief program (LSRV)', p.LSRV_Status],
             ['Relief Con Ed is buying', p.CapacityMW ? `${p.CapacityMW} MW` : '—'],
             ['Already committed', p.SubscribedMW ? `${p.SubscribedMW} MW` : '—'],
-            ['Your scenario adds', ns ? `${ns.addedMw.toFixed(2)} MW (${fmt.int(ns.evs)} EVs) · ${fmt.pct(ns.ratio)} of the mid-point` : null],
+            ['Your scenario adds', ns ? `${ns.addedMw.toFixed(2)} MW (${fmt.int(ns.evs)} EVs) · ${fmt.fill(ns.ratio)} of the mid-point` : null],
             ['Map-sheet room, total', ns?.plateHeadroomMw != null ? `${ns.plateHeadroomMw.toFixed(1)} MW` : null],
             ['Notes', p.Notes],
           ]);
           break;
         }
         case 'tracts-fill': {
-          const ts = area?.tractStats.get(String(p.GEOID));
-          html = popupHtml(`Neighbourhood (Census tract ${p.name})`, [
+          const ts = areaRef.current?.tractStats.get(String(p.GEOID));
+          html = popupHtml(`Neighbourhood (${String(p.name).replace(/^Census Tract/, 'Census tract')})`, [
             ['GEOID', p.GEOID],
             ['Population', fmt.int(p.pop)],
             ['Households', fmt.int(p.hh)],
@@ -633,47 +687,52 @@ export function MapView() {
       type: 'FeatureCollection',
       features: sites.map((s: Site) => {
         const a = assessments.get(s.id);
-        const status: Status = a?.worst ?? 'unknown';
+        const moving = drag?.id === s.id;
+        const status: Status = moving ? 'unknown' : a?.worst ?? 'unknown';
+        const word = moving ? 'drop to re-check' : !a || a.provisional ? 'checking…' : a.worst === 'crit' ? "doesn't fit" : a.worst === 'warn' ? 'tight' : a.worst === 'ok' ? 'fits' : 'no data';
         return {
           type: 'Feature',
-          geometry: { type: 'Point', coordinates: [s.lng, s.lat] },
+          geometry: { type: 'Point', coordinates: moving ? [drag!.lng, drag!.lat] : [s.lng, s.lat] },
           properties: {
             id: s.id,
-            label: `${s.name} · ${a ? fmt.kw(a.coincidentKw) + ' at 5 PM' : fmt.kw(nameplateKw(s))}${a ? ' · ' + (a.worst === 'crit' ? "doesn't fit" : a.worst === 'warn' ? 'tight' : a.worst === 'ok' ? 'fits' : '') : ''}`,
+            label: `${s.name} · ${a ? fmt.kw(a.coincidentKw) + ' at 5 PM' : fmt.kw(nameplateKw(s))} · ${word}`,
+            short: s.name,
             color: STATUS_COLOR[status],
             selected: s.id === selectedSiteId,
           },
         };
       }),
     };
-  }, [sites, assessments, selectedSiteId]);
+  }, [sites, assessments, selectedSiteId, drag]);
   const radiusFC = useMemo<FC>(
     () => ({
       type: 'FeatureCollection',
       features: sites.map((s) => {
-        const c = turf.circle([s.lng, s.lat], s.radiusM / 1000, { steps: 48, units: 'kilometers' });
+        const moving = drag?.id === s.id;
+        const c = turf.circle(moving ? [drag!.lng, drag!.lat] : [s.lng, s.lat], s.radiusM / 1000, { steps: 48, units: 'kilometers' });
         const a = assessments.get(s.id);
-        return { ...c, properties: { color: STATUS_COLOR[a?.worst ?? 'unknown'], selected: s.id === selectedSiteId } } as FC['features'][number];
+        return { ...c, properties: { color: STATUS_COLOR[moving ? 'unknown' : a?.worst ?? 'unknown'], selected: s.id === selectedSiteId } } as FC['features'][number];
       }),
     }),
-    [sites, assessments, selectedSiteId],
+    [sites, assessments, selectedSiteId, drag],
   );
   const impactFC = useMemo<FC>(() => {
     const feats: any[] = [];
     const targets = selectedSiteId ? sites.filter((s) => s.id === selectedSiteId) : sites;
     for (const s of targets) {
       const a = assessments.get(s.id);
-      if (!a) continue;
+      // nothing to point at until the equipment around the site has loaded, or while the pin is in the air
+      if (!a || a.provisional || drag?.id === s.id) continue;
       for (const asset of a.assets) {
         if (asset.status === 'unknown' || asset.kind === 'network') continue;
-        const pct = asset.ratio != null ? `${Math.round(Math.min(asset.ratio, 9.99) * 100)}%` : undefined;
+        const pct = asset.ratio != null ? fmt.fill(asset.ratio) : undefined;
         feats.push({ type: 'Feature', geometry: asset.geometry, properties: { color: STATUS_COLOR[asset.status], kind: asset.kind, label: pct } });
         if (asset.geometry.type === 'Point' && asset.ratio != null)
           feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [[s.lng, s.lat], asset.geometry.coordinates] }, properties: { color: STATUS_COLOR[asset.status], kind: 'flow' } });
       }
     }
     return { type: 'FeatureCollection', features: feats };
-  }, [sites, assessments, selectedSiteId]);
+  }, [sites, assessments, selectedSiteId, drag]);
   useEffect(() => setData('sites', siteFC), [siteFC, styleNonce]);
   useEffect(() => setData('site-radius', radiusFC), [radiusFC, styleNonce]);
   useEffect(() => setData('impact', impactFC), [impactFC, styleNonce]);
@@ -696,6 +755,13 @@ export function MapView() {
     vis(['feeders33kv-line'], layers.feeders33kv);
     vis(['sites-circle', 'sites-label', 'sites-icon'], layers.sites);
     vis(['site-radius-fill', 'site-radius-line', 'impact-line', 'impact-point', 'impact-fill', 'impact-flow', 'impact-label'], layers.sites && mode === 'sites');
+    if (map.getLayer('sites-label')) {
+      map.setLayoutProperty('sites-label', 'text-field', ['get', mode === 'outlook' ? 'short' : 'label']);
+      map.setLayoutProperty('sites-label', 'text-allow-overlap', mode === 'sites');
+    }
+    // In Outlook the borough / DAC choices live in the left panel and drive both the numbers and the map.
+    const boroughs = mode === 'outlook' ? areaBoroughs : filters.boroughs;
+    const dacOnly = mode === 'outlook' ? areaDacOnly : filters.dacOnly;
 
     // transformer filter
     const xf: any[] = ['all'];
@@ -713,17 +779,17 @@ export function MapView() {
     map.setFilter('buildings-fill', bf);
     // networks
     const nf: any[] = ['all'];
-    if (filters.boroughs.length) nf.push(['in', ['get', 'BOROUGH'], ['literal', filters.boroughs]]);
+    if (boroughs.length) nf.push(['in', ['get', 'BOROUGH'], ['literal', boroughs]]);
     if (filters.networkMinRemaining > 0) nf.push(['>=', ['-', ['coalesce', ['get', 'CapacityMW'], 0], ['coalesce', ['get', 'SubscribedMW'], 0]], filters.networkMinRemaining]);
     ['networks-fill', 'networks-line', 'networks-label'].forEach((id) => map.setFilter(id, nf));
     map.setFilter('msplates-fill', ['>=', ['coalesce', ['get', 'KVA'], 0], filters.plateMinKva]);
     map.setFilter('msplates-line', ['>=', ['coalesce', ['get', 'KVA'], 0], filters.plateMinKva]);
     // tracts filter (DAC only)
     const tf: any[] = ['all'];
-    if (filters.dacOnly) tf.push(['==', ['get', 'dac'], 1]);
+    if (dacOnly) tf.push(['==', ['get', 'dac'], 1]);
     map.setFilter('tracts-fill', tf);
     map.setFilter('tracts-line', tf);
-  }, [layers, filters, area, styleNonce, mode]);
+  }, [layers, filters, area, styleNonce, mode, areaBoroughs, areaDacOnly]);
 
   // ---------- per-layer opacity (user-adjustable in the Layers drawer) ----------
   useEffect(() => {
@@ -777,15 +843,15 @@ export function MapView() {
         0,
         'rgba(0,0,0,0)',
         Math.max(1, q[1]),
-        '#1d4ed8',
+        GROWTH_RAMP[0],
         Math.max(2, q[2]),
-        '#0ea5e9',
+        GROWTH_RAMP[1],
         Math.max(3, q[3]),
-        '#facc15',
+        GROWTH_RAMP[2],
         Math.max(4, q[4]),
-        '#f97316',
+        GROWTH_RAMP[3],
         Math.max(5, q[5]),
-        '#ef4444',
+        GROWTH_RAMP[4],
       ]);
       // network status
       cancels.push(
@@ -835,21 +901,28 @@ export function MapView() {
     if (flyTo && mapRef.current) mapRef.current.flyTo({ center: flyTo.center, zoom: flyTo.zoom, essential: true });
   }, [flyTo]);
 
-  // keyboard: Esc cancels placing
+  // keyboard: Esc backs out of placing, the open drawer and any popup
   useEffect(() => {
-    const h = (e: KeyboardEvent) => e.key === 'Escape' && setPlacing(false);
+    const h = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setPlacing(false);
+      setDrawer(null);
+      popupRef.current?.remove();
+    };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [setPlacing]);
+  }, [setPlacing, setDrawer]);
 
   const zoom = viewport.zoom;
   const loadingAny = Object.values(live.loading).some(Boolean);
+  const gridFailed = !!(live.errors.transformers || live.errors.feeders || live.errors.structures);
   const selectedSite = sites.find((s) => s.id === selectedSiteId);
   const hints: string[] = [];
   if (mode === 'sites') {
     const wantsEquipment = layers.transformers || layers.feeders || layers.buildings || layers.structures;
     if (wantsEquipment && zoom < MIN_ZOOM.feeders) hints.push('Zoom in to see grid equipment (transformers at 14+, buildings at 15+) — or click ⌖ on a site');
     else if (!selectedSiteIdForHint && sites.length) hints.push('Click a site pin or card to see its traffic lights · click any dot for details');
+    else if (selectedSiteIdForHint) hints.push('Drag the pin to try another spot — the verdict re-checks itself');
   } else if (!area) hints.push('Turn the outlook on in the left panel to see the heat map');
   const errs = Object.entries(live.errors).filter(([, v]) => v);
 
@@ -861,7 +934,7 @@ export function MapView() {
           <div className="section" style={{ maxWidth: 420, textAlign: 'center' }}>
             <h3 style={{ marginTop: 0 }}>Map unavailable</h3>
             <p className="muted">{webglError}</p>
-            <p className="muted">The Analytics and Help tabs still work; site assessments need grid data loaded from the map.</p>
+            <p className="muted">The Results and Learn tabs still work.</p>
           </div>
         </div>
       )}
@@ -879,15 +952,18 @@ export function MapView() {
         ))}
       </div>
       {placing && <div className="map-overlay placing-banner">Click anywhere on the map to put chargers there · Esc to cancel</div>}
-      {!placing && mode === 'sites' && selectedSite && <VerdictBanner site={selectedSite} a={assessments.get(selectedSite.id)} loading={loadingAny} />}
+      {!placing && mode === 'sites' && selectedSite && <VerdictBanner site={selectedSite} a={drag?.id === selectedSite.id ? undefined : assessments.get(selectedSite.id)} loading={loadingAny} failed={gridFailed} moving={drag?.id === selectedSite.id} />}
       <Legend thresholds={thresholds} areaActive={!!area && layers.areaStress} layers={layers} zoom={zoom} />
       <div className="map-overlay map-tools">
-        <button className={`btn small ${drawer === 'layers' ? 'active' : ''}`} onClick={() => setDrawer(drawer === 'layers' ? null : 'layers')} id="tour-layers-btn">
+        <button className={`btn small ${drawer === 'layers' ? 'active' : ''}`} onClick={() => setDrawer(drawer === 'layers' ? null : 'layers')} id="tour-layers-btn" aria-expanded={drawer === 'layers'}>
           ◧ Layers
         </button>
-        <button className={`btn small ${drawer === 'filters' ? 'active' : ''}`} onClick={() => setDrawer(drawer === 'filters' ? null : 'filters')} id="tour-filters-btn">
-          ⚲ Filters
-        </button>
+        {/* Outlook has no separate map filters: its borough / DAC choices are in the left panel */}
+        {mode === 'sites' && (
+          <button className={`btn small ${drawer === 'filters' ? 'active' : ''}`} onClick={() => setDrawer(drawer === 'filters' ? null : 'filters')} id="tour-filters-btn" aria-expanded={drawer === 'filters'}>
+            ⚲ Filters
+          </button>
+        )}
         <button className={`btn small ${layers.satellite ? 'active' : ''}`} onClick={() => setLayers({ satellite: !layers.satellite })} title="Toggle satellite imagery">
           {layers.satellite ? 'Dark map' : 'Satellite'}
         </button>
@@ -896,11 +972,11 @@ export function MapView() {
         <div className="map-overlay map-drawer" id="tour-drawer">
           <div className="row between" style={{ padding: '8px 12px 0' }}>
             <b>{drawer === 'layers' ? 'Map layers' : 'Filters'}</b>
-            <button className="btn small" onClick={() => setDrawer(null)}>
+            <button className="btn small" onClick={() => setDrawer(null)} aria-label="Close" title="Close (Esc)">
               ×
             </button>
           </div>
-          {drawer === 'layers' ? <LayersPanel mode={mode} /> : <FiltersPanel mode={mode} />}
+          {drawer === 'layers' ? <LayersPanel mode={mode} /> : <FiltersPanel />}
         </div>
       )}
     </div>
@@ -908,16 +984,18 @@ export function MapView() {
 }
 
 /** Floating answer over the map for the selected site; re-mounts (and pulses) whenever the verdict changes. */
-function VerdictBanner({ site, a, loading }: { site: Site; a?: import('../types').SiteAssessment; loading: boolean }) {
-  const v = verdictFor(a, loading);
+function VerdictBanner({ site, a, loading, failed, moving }: { site: Site; a?: import('../types').SiteAssessment; loading: boolean; failed: boolean; moving?: boolean }) {
+  const base = verdictFor(a, loading, failed);
+  // pin in the air: say what dropping it will do rather than "loading"
+  const v = moving ? { ...base, title: 'Drop the pin to check this spot', summary: 'The traffic lights re-check as soon as you let go.' } : base;
   const key = `${site.id}-${v.level}-${Math.round(a?.coincidentKw ?? 0)}-${v.counts.crit}-${v.counts.warn}`;
   return (
-    <div key={key} className={`map-overlay verdict-banner ${v.status}`} id="tour-map-verdict" onClick={() => document.getElementById('tour-verdict')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+    <div key={key} className={`map-overlay verdict-banner ${v.status}`} id="tour-map-verdict" role="status" onClick={() => document.getElementById('tour-verdict')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
       <span className={`status ${v.status}`} />
       <div>
         <div className="vb-title">
           {site.name}: <b>{v.title}</b>
-          {a && (
+          {v.level !== 'unknown' && v.level !== 'nodata' && (
             <span className="verdict-counts">
               <span style={{ color: 'var(--ok)' }}>{v.counts.ok} green</span> · <span style={{ color: 'var(--warn)' }}>{v.counts.warn} amber</span> · <span style={{ color: 'var(--crit)' }}>{v.counts.crit} red</span>
             </span>

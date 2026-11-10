@@ -8,7 +8,8 @@ const BUCKETS = ['< 200 kVA', '200 kVA to 499 kVA', '500 kVA to 1000 kVA', '> 10
 const BOROUGHS = ['Manhattan', 'Bronx', 'Brooklyn', 'Queens', 'Staten Island', 'Westchester'];
 const FEEDER_KV = ['4', '13', '27', '33'];
 
-export function FiltersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
+/** Filters for the Sites map. (Outlook's borough / DAC choices live in its left panel and drive its map directly.) */
+export function FiltersPanel() {
   const filters = useStore((s) => s.filters);
   const setFilters = useStore((s) => s.setFilters);
   const resetFilters = useStore((s) => s.resetFilters);
@@ -22,8 +23,6 @@ export function FiltersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
         </button>
       </div>
 
-      {mode === 'sites' && (
-      <>
       <h3>
         Transformers (the taps) <Help text="Show only transformers of a certain type and with a certain amount of room left. Typical use: find the big 460 V ones (over 1000 kVA) that a fast-charging station needs." />
       </h3>
@@ -33,23 +32,13 @@ export function FiltersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
 
       <h3>Street mains (feeders)</h3>
       <Slider label="Minimum room left for EVs" value={filters.feederMinHeadroom} min={0} max={10} step={0.25} format={(v) => `${v} MW`} onChange={(feederMinHeadroom) => setFilters({ feederMinHeadroom })} help="Hide street mains that have less than this much room left for new EV load." />
-      <Chips options={FEEDER_KV.map((v) => ({ value: v, label: `${v} kV` }))} value={filters.feederVoltages} onChange={(feederVoltages) => setFilters({ feederVoltages })} />
+      <Chips allLabel="Any voltage" options={FEEDER_KV.map((v) => ({ value: v, label: `${v} kV` }))} value={filters.feederVoltages} onChange={(feederVoltages) => setFilters({ feederVoltages })} />
 
       <h3>Grid zones & map sheets</h3>
-      <Chips options={BOROUGHS.map((b) => ({ value: b, label: b }))} value={filters.boroughs} onChange={(boroughs) => setFilters({ boroughs })} />
+      <Chips allLabel="All boroughs" options={BOROUGHS.map((b) => ({ value: b, label: b }))} value={filters.boroughs} onChange={(boroughs) => setFilters({ boroughs })} />
       <Slider label="Min spare MW Con Ed is buying back" value={filters.networkMinRemaining} min={0} max={20} step={0.5} format={(v) => `${v} MW`} onChange={(networkMinRemaining) => setFilters({ networkMinRemaining })} help="Show only grid zones where Con Edison still has at least this much load relief to buy (its LSRV program). Most zones publish 0." />
       <Slider label="Min room left per map sheet" value={filters.plateMinKva} min={0} max={5000} step={100} format={(v) => `${v} kVA`} onChange={(plateMinKva) => setFilters({ plateMinKva })} />
-      </>
-      )}
-      {mode === 'outlook' && (
-        <>
-          <h3>Grid zones</h3>
-          <Chips options={BOROUGHS.map((b) => ({ value: b, label: b }))} value={filters.boroughs} onChange={(boroughs) => setFilters({ boroughs })} />
-        </>
-      )}
 
-      {mode === 'sites' && (
-      <>
       <h3>
         Neighbourhood statistics <Help text="Shade every Census neighbourhood by one statistic — income, renters, car ownership and so on. Turns the neighbourhood layer on." />
       </h3>
@@ -63,20 +52,13 @@ export function FiltersPanel({ mode }: { mode: 'sites' | 'outlook' }) {
         }}
         help={filters.acsVariable !== 'none' ? ACS_VARS[filters.acsVariable].help : 'Pick a statistic to see what it means.'}
       />
-      </>
-      )}
-      {mode === 'outlook' && <h3>Neighbourhoods</h3>}
-      <Check label="Disadvantaged communities only" checked={filters.dacOnly} onChange={(dacOnly) => setFilters({ dacOnly })} />
+      <Check label="Shade disadvantaged communities only" checked={filters.dacOnly} onChange={(dacOnly) => setFilters({ dacOnly })} />
 
-      {mode === 'sites' && (
-      <>
       <h3>
         Buildings <Help text="Show only certain kinds of buildings — for example apartment buildings with 50+ homes, which are good candidates for garage chargers." />
       </h3>
       <Slider label="Minimum homes in the building" value={filters.minUnits} min={0} max={300} step={5} onChange={(minUnits) => setFilters({ minUnits })} />
-      <Chips options={LAND_USE_CODES.map(([code, name]) => ({ value: code, label: name }))} value={filters.plutoLandUse} onChange={(plutoLandUse) => setFilters({ plutoLandUse })} />
-      </>
-      )}
+      <Chips allLabel="All kinds" options={LAND_USE_CODES.map(([code, name]) => ({ value: code, label: name }))} value={filters.plutoLandUse} onChange={(plutoLandUse) => setFilters({ plutoLandUse })} />
     </div>
   );
 }

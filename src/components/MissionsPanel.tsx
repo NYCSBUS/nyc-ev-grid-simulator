@@ -11,13 +11,16 @@ export function useMissionTracker() {
   const complete = useStore((s) => s.completeMission);
   const assessments = useAssessments();
   const area = useAreaResult();
+  const touring = useStore((s) => s.tourRequested);
   useEffect(() => {
+    // No credit for what the tour did, and no judging a site before the grid around it has loaded.
+    if (touring || [...assessments.values()].some((x) => x.provisional)) return;
     const ctx = { scenario, assessments, area, analyticsVisited };
     for (const m of MISSIONS) {
       if (done.includes(m.id)) continue;
-      if (m.check(ctx).done) complete(m.id);
+      if (m.check(ctx).done) complete(m.id, m.title.replace(/^\d+ · /, ''));
     }
-  }, [scenario, assessments, area, analyticsVisited, done, complete]);
+  }, [scenario, assessments, area, analyticsVisited, done, complete, touring]);
 }
 
 export function MissionsPanel() {

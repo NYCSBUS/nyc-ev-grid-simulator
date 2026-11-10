@@ -22,10 +22,38 @@ export function ScenarioPanel() {
   const assessments = useAssessments();
   const selected = scenario.sites.find((s) => s.id === selectedSiteId);
 
+  // One site open: the editor takes the whole panel, so the verdict, the chargers and the levers sit together near the top.
+  if (selected) {
+    const a = assessments.get(selected.id);
+    return (
+      <div className="panel" id="tour-scenario">
+        <div className="detail-head">
+          <button className="btn small" id="tour-back" onClick={() => selectSite(null)}>
+            ← All sites ({scenario.sites.length})
+          </button>
+          <span className="row" style={{ gap: 4 }}>
+            {a?.inDac && (
+              <Tip text="This site is inside a State-designated Disadvantaged Community, so it gets the larger grant rate.">
+                <span className="pill warn">DAC</span>
+              </Tip>
+            )}
+            <button className="btn small" onClick={() => requestFlyTo([selected.lng, selected.lat], 16)} title="Zoom the map to this site" aria-label="Zoom the map to this site">
+              ⌖ Zoom
+            </button>
+            <button className="btn small danger" onClick={() => removeSite(selected.id)} title="Remove this site (you can undo)">
+              Remove
+            </button>
+          </span>
+        </div>
+        <SiteEditor site={selected} />
+      </div>
+    );
+  }
+
   return (
     <div className="panel" id="tour-scenario">
       <h2>
-        Charging sites ({scenario.sites.length}){' '}
+        <span>Charging sites ({scenario.sites.length})</span>
         <Help text="A site is one charging project at one address. The simulator works out what it draws at the grid's 5 PM rush hour, sends that load to the nearest grid equipment (transformers, street mains, vaults, grid zone) and checks how much room each has left." />
       </h2>
       <div className="row" style={{ marginBottom: 10 }}>
@@ -38,12 +66,26 @@ export function ScenarioPanel() {
       </div>
       {scenario.sites.map((s) => {
         const a = assessments.get(s.id);
+        const v = verdictFor(a);
         return (
-          <div key={s.id} className={`site-card ${s.id === selectedSiteId ? 'selected' : ''}`} onClick={() => selectSite(s.id === selectedSiteId ? null : s.id)}>
+          <div
+            key={s.id}
+            className="site-card"
+            role="button"
+            tabIndex={0}
+            aria-label={`${s.name}: ${VERDICT_WORD[v.level]}. Open to edit.`}
+            onClick={() => selectSite(s.id)}
+            onKeyDown={(e) => {
+              if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                e.preventDefault();
+                selectSite(s.id);
+              }
+            }}
+          >
             <div className="title">
               <span className="row" style={{ gap: 6 }}>
-                <StatusDot status={a?.worst ?? 'unknown'} /> {s.name}
-                <span className={`pill ${a?.worst ?? 'unknown'}`}>{VERDICT_WORD[verdictFor(a).level]}</span>
+                <StatusDot status={v.status} /> {s.name}
+                <span className={`pill ${v.status}`}>{VERDICT_WORD[v.level]}</span>
               </span>
               <span className="row" style={{ gap: 4 }}>
                 <button
@@ -53,6 +95,7 @@ export function ScenarioPanel() {
                     requestFlyTo([s.lng, s.lat], 16);
                   }}
                   title="Zoom to site"
+                  aria-label={`Zoom to ${s.name}`}
                 >
                   ⌖
                 </button>
@@ -62,7 +105,8 @@ export function ScenarioPanel() {
                     e.stopPropagation();
                     removeSite(s.id);
                   }}
-                  title="Remove site"
+                  title="Remove site (you can undo)"
+                  aria-label={`Remove ${s.name}`}
                 >
                   ×
                 </button>
@@ -82,14 +126,18 @@ export function ScenarioPanel() {
           </div>
         );
       })}
-      {!scenario.sites.length && <div className="empty">No charging sites yet. Search an address above or click “Add site on map”.</div>}
-
-      {selected && <SiteEditor site={selected} />}
-      {!selected && scenario.sites.length > 0 && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Click a site above to edit it and see its traffic lights.</div>}
+      {!scenario.sites.length && <div className="empty">No charging sites yet. Search an address above, or click “+ Add a site” and then the map.</div>}
+      {scenario.sites.length > 0 && (
+        <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+          Click a site to edit it and see its traffic lights. On the map, drag a pin to move it.
+        </div>
+      )}
 
       <div className="row between" style={{ marginTop: 18, fontSize: 12 }}>
-        <span className="muted">Scenario name</span>
-        <input type="text" value={scenario.name} onChange={(e) => setScenarioName(e.target.value)} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', width: 180 }} title="Scenario name" />
+        <label className="muted" htmlFor="scenario-name">
+          Scenario name
+        </label>
+        <input id="scenario-name" type="text" value={scenario.name} onChange={(e) => setScenarioName(e.target.value)} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 8px', width: 180 }} />
       </div>
     </div>
   );
@@ -99,8 +147,8 @@ function Fold({ title, children, defaultOpen = false }: { title: string; childre
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="fold">
-      <button className="fold-head" onClick={() => setOpen(!open)}>
-        <span>{open ? '▾' : '▸'}</span> {title}
+      <button className="fold-head" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span aria-hidden>{open ? '▾' : '▸'}</span> {title}
       </button>
       {open && <div className="fold-body">{children}</div>}
     </div>
@@ -108,28 +156,31 @@ function Fold({ title, children, defaultOpen = false }: { title: string; childre
 }
 
 /** The answer, up front: fits / tight / doesn't fit, with the one number that matters and what to try next. */
-function VerdictCard({ a, loading }: { a?: SiteAssessment; loading: boolean }) {
-  const v = verdictFor(a, loading);
+function VerdictCard({ a, loading, failed }: { a?: SiteAssessment; loading: boolean; failed: boolean }) {
+  const v = verdictFor(a, loading, failed);
   // re-trigger the pulse animation whenever the verdict changes
   const key = `${v.level}-${Math.round(a?.coincidentKw ?? 0)}-${v.counts.crit}-${v.counts.warn}`;
   return (
-    <div key={key} className={`verdict ${v.status}`} id="tour-verdict">
+    // the id sits on a wrapper that never re-mounts, so the tour's highlight survives a verdict change
+    <div id="tour-verdict">
+    <div key={key} className={`verdict ${v.status}`} role="status">
       <div className="verdict-head">
         <StatusDot status={v.status} />
         <b>{v.title}</b>
-        {a && (
-          <span className="verdict-counts">
-            <span style={{ color: 'var(--ok)' }}>{v.counts.ok}</span> / <span style={{ color: 'var(--warn)' }}>{v.counts.warn}</span> / <span style={{ color: 'var(--crit)' }}>{v.counts.crit}</span>
-          </span>
-        )}
       </div>
+      {v.level !== 'unknown' && v.level !== 'nodata' && (
+        <div className="verdict-counts">
+          Lights: <span style={{ color: 'var(--ok)' }}>{v.counts.ok} green</span> · <span style={{ color: 'var(--warn)' }}>{v.counts.warn} amber</span> · <span style={{ color: 'var(--crit)' }}>{v.counts.crit} red</span>
+        </div>
+      )}
       <div className="verdict-body">{v.summary}</div>
       {v.advice && <div className="verdict-advice">{v.advice}</div>}
-      {a && (
+      {a && !a.provisional && (
         <button className="btn small" style={{ marginTop: 6 }} onClick={() => document.getElementById('tour-impact')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
           See every traffic light ↓
         </button>
       )}
+    </div>
     </div>
   );
 }
@@ -145,9 +196,9 @@ function SiteEditor({ site }: { site: Site }) {
   return (
     <div className="section" id="tour-site-editor">
       <div className="field">
-        <input type="text" className="wide" value={site.name} onChange={(e) => set({ name: e.target.value })} placeholder="Site name" />
+        <input type="text" className="wide" value={site.name} onChange={(e) => set({ name: e.target.value })} placeholder="Site name" aria-label="Site name" />
       </div>
-      <VerdictCard a={a} loading={!!(live.loading.transformers || live.loading.feeders || live.loading.structures)} />
+      <VerdictCard a={a} loading={!!(live.loading.transformers || live.loading.feeders || live.loading.structures)} failed={!!(live.errors.transformers || live.errors.feeders || live.errors.structures)} />
 
       <h3 id="tour-chargers" style={{ marginTop: 6 }}>
         Chargers <Help text="How many plugs of each kind. Level 2 = overnight-speed (like a dryer outlet); DC fast = 20-minute charging. Adding them up gives the sticker rating (nameplate). Fast chargers need the higher-voltage 460 V type of transformer, so the simulator looks for one of those first." />
@@ -159,9 +210,13 @@ function SiteEditor({ site }: { site: Site }) {
               <span>{CHARGERS[k].label}</span>
             </Tip>
             <div className="stepper">
-              <button onClick={() => setCharger(k, (site.chargers[k] || 0) - 1)}>−</button>
-              <input type="number" min={0} value={site.chargers[k] || 0} onChange={(e) => setCharger(k, +e.target.value)} />
-              <button onClick={() => setCharger(k, (site.chargers[k] || 0) + 1)}>+</button>
+              <button onClick={() => setCharger(k, (site.chargers[k] || 0) - 1)} aria-label={`One fewer ${CHARGERS[k].label} plug`}>
+                −
+              </button>
+              <input type="number" min={0} value={site.chargers[k] || 0} onChange={(e) => setCharger(k, +e.target.value)} aria-label={`Number of ${CHARGERS[k].label} plugs`} />
+              <button onClick={() => setCharger(k, (site.chargers[k] || 0) + 1)} aria-label={`One more ${CHARGERS[k].label} plug`}>
+                +
+              </button>
             </div>
           </div>
         ))}
@@ -184,10 +239,10 @@ function SiteEditor({ site }: { site: Site }) {
           .filter((k) => (site.chargers[k] || 0) > 0)
           .map((k) => (
             <div key={k} className="field">
-              <label>
+              <span className="label">
                 {CHARGERS[k].label}
                 <span className="muted" style={{ fontSize: 11 }}>→ {plugKw(site, k)} kW each</span>
-              </label>
+              </span>
               <span className="row" style={{ gap: 4 }}>
                 <input
                   type="number"
@@ -195,6 +250,7 @@ function SiteEditor({ site }: { site: Site }) {
                   max={CHARGERS[k].kw}
                   step={0.5}
                   placeholder={String(CHARGERS[k].kw)}
+                  aria-label={`Cap per ${CHARGERS[k].label} plug, kW`}
                   value={site.derateKw?.[k] ?? ''}
                   onChange={(e) => {
                     const v = e.target.value === '' ? undefined : Math.max(0, +e.target.value);
@@ -244,8 +300,8 @@ function SiteEditor({ site }: { site: Site }) {
         Traffic lights at the 5 PM rush{' '}
         <Help text="Each row is a piece of nearby grid equipment. The percentage is how much of its remaining room this site would use at the grid's rush hour: green under 60 %, amber up to 100 %, red over. Numbers come from Con Edison's public capacity maps." />
       </h3>
-      {!a && <div className="muted">Loading Con Edison equipment around the site…</div>}
-      {a && (
+      {(!a || a.provisional) && <div className="muted">Loading Con Edison equipment around the site…</div>}
+      {a && !a.provisional && (
         <>
           <div className="row between" style={{ marginBottom: 6 }}>
             <span>
@@ -271,7 +327,7 @@ function SiteEditor({ site }: { site: Site }) {
                 </div>
               </div>
               <div className="num">
-                <div>{x.ratio != null ? fmt.pct(Math.min(x.ratio, 9.99)) : '—'}</div>
+                <div>{fmt.fill(x.ratio)}</div>
                 <div className="sub">
                   {fmt.kw(x.addedKw)} / {fmt.kw(x.headroomKw)}
                 </div>
@@ -382,8 +438,8 @@ function AreaEditor() {
       </div>
       </Fold>
       <h3>Which boroughs</h3>
-      <Chips options={BOROUGHS.map((b) => ({ value: b, label: b }))} value={area.boroughs} onChange={(boroughs) => setArea({ boroughs })} />
-      <Check label="Disadvantaged communities only" checked={area.dacOnly} onChange={(dacOnly) => setArea({ dacOnly })} />
+      <Chips allLabel="All boroughs" options={BOROUGHS.map((b) => ({ value: b, label: b }))} value={area.boroughs} onChange={(boroughs) => setArea({ boroughs })} />
+      <Check label="Disadvantaged communities only" checked={area.dacOnly} onChange={(dacOnly) => setArea({ dacOnly })} help="Count and show only neighbourhoods the State has flagged as Disadvantaged Communities. The map and the totals both follow this." />
       {result && (
         <div className="section" style={{ marginTop: 10, background: 'var(--bg)' }}>
           <div className="row between">

@@ -83,6 +83,8 @@ export interface Settings {
   /** Assumed existing loading on a transformer before EV load (0-1). */
   xfmrBaseLoading: number;
   cost: CostParams;
+  /** Optional total-cost budget for the scenario, $. Results compares the estimate against it. */
+  budget?: number;
 }
 
 export interface Filters {
@@ -157,6 +159,8 @@ export interface SiteAssessment {
   annualMwh: number;
   assets: AssetStatus[];
   worst: Status;
+  /** True while the live grid data around this site has not finished loading; `worst` is held at 'unknown' until it has. */
+  provisional?: boolean;
   inDac: boolean;
   inNetworkArea: boolean;
   notes: string[];

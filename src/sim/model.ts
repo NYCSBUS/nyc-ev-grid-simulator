@@ -10,7 +10,12 @@ export interface SiteContext {
   networks: FC<Polygon | MultiPolygon>;
   tracts: FC<Polygon | MultiPolygon>;
   structures?: FC<Point>;
+  /** Cover keys (see `coverKey`) of the sites whose surroundings have been fetched. Omit to treat everything as loaded. */
+  covered?: string[];
 }
+
+/** Identifies "the live data around this site": changes when the site moves, its search circle changes, or the season changes. */
+export const coverKey = (s: Site, season: string) => `${s.lng.toFixed(5)},${s.lat.toFixed(5)},${s.radiusM},${season}`;
 
 export function nameplateKw(site: Site): number {
   return (Object.keys(site.chargers) as Array<keyof typeof CHARGERS>).reduce((s, k) => s + (site.chargers[k] || 0) * CHARGERS[k].kw, 0);
