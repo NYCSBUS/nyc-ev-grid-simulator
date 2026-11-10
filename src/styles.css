@@ -49,7 +49,9 @@ h4 {
 
 .app {
   display: grid;
-  grid-template-rows: 48px 1fr;
+  /* minmax(0, …) so wide content inside scrolls in place instead of stretching the whole page */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 48px minmax(0, 1fr);
   height: 100%;
 }
 
@@ -105,7 +107,8 @@ h4 {
 }
 .search {
   position: relative;
-  width: 360px;
+  flex: 0 1 360px;
+  min-width: 150px;
 }
 .search input {
   width: 100%;
@@ -178,6 +181,9 @@ h4 {
 .btn.small {
   padding: 3px 8px;
   font-size: 12px;
+  min-height: 24px;
+  min-width: 24px;
+  justify-content: center;
 }
 .btn.active {
   border-color: var(--accent);
@@ -213,8 +219,8 @@ h4 {
   top: 6px;
   right: 4px;
   z-index: 2;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
   border: 1px solid transparent;
   background: transparent;
@@ -314,8 +320,13 @@ h4 {
 .site-card .title .pill {
   white-space: nowrap;
 }
+.site-card .title > .row:last-child {
+  flex: none;
+  flex-wrap: nowrap;
+}
 .panel {
   overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
   padding: 12px 14px 40px;
 }
@@ -356,10 +367,12 @@ h4 {
   gap: 6px 10px;
   padding: 5px 0;
 }
-.field label {
+.field label,
+.field .label {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 .field .value {
   color: var(--accent);
@@ -381,6 +394,19 @@ h4 {
   padding: 4px 8px;
   width: 110px;
 }
+.field select {
+  width: auto;
+  min-width: 110px;
+  max-width: 200px;
+}
+/* a control with long option text sits on its own row under its label, so nothing is cut off */
+.field.stack {
+  grid-template-columns: 1fr;
+}
+.field.stack select {
+  width: 100%;
+  max-width: none;
+}
 .field input[type='text'].wide {
   width: 100%;
   grid-column: 1 / -1;
@@ -394,6 +420,15 @@ h4 {
 }
 .check input {
   accent-color: var(--accent);
+}
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.row.wrap {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .row {
   display: flex;
@@ -434,6 +469,23 @@ h4 {
   font-size: 10px;
   cursor: help;
   flex: none;
+  position: relative;
+}
+/* 15 px dot, 25 px hit area */
+.help-dot::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+}
+
+/* ---------- keyboard focus ---------- */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.site-card:focus-visible,
+.help-dot:focus-visible {
+  outline-offset: 1px;
 }
 
 /* ---------- tooltip ---------- */
@@ -559,7 +611,7 @@ h4 {
 
 .charger-grid {
   display: grid;
-  grid-template-columns: 1fr 90px;
+  grid-template-columns: 1fr auto;
   gap: 6px 10px;
   align-items: center;
 }
@@ -576,8 +628,10 @@ h4 {
   gap: 4px;
 }
 .stepper button {
-  width: 24px;
-  height: 24px;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--bg);
@@ -976,10 +1030,13 @@ table.data tr:hover td {
   font-size: 14px;
 }
 .verdict-counts {
-  margin-left: auto;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.verdict > .verdict-counts {
+  margin-top: 4px;
+  color: var(--muted);
 }
 .verdict-body {
   margin-top: 6px;
@@ -1054,12 +1111,116 @@ table.data tr:hover td {
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100vw - 24px);
   background: var(--panel);
   border: 1px solid var(--accent);
   border-radius: 20px;
   padding: 8px 16px;
   z-index: 2000;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.toast .btn {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---------- first-visit welcome ---------- */
+.welcome {
+  position: fixed;
+  left: 50%;
+  bottom: 64px;
+  transform: translateX(-50%);
+  width: min(460px, calc(100vw - 24px));
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  z-index: 1500;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+  font-size: 13px;
+}
+.welcome p {
+  margin: 6px 0 12px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+/* ---------- one site open (detail view) ---------- */
+.detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* ---------- results: bottom line ---------- */
+.bottom-line {
+  border-color: var(--accent);
+}
+.bottom-line h3 {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bottom-line .budget {
+  font-size: 12px;
+  font-weight: 400;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+.bottom-line .budget input {
+  width: 120px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.bottom-line ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.bottom-line li {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #dbe4ec;
+}
+.bottom-line .tag {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  border-left: 3px solid var(--border);
+  padding-left: 8px;
+}
+.bottom-line .tag.ok {
+  border-left-color: var(--ok);
+}
+.bottom-line .tag.warn {
+  border-left-color: var(--warn);
+}
+.bottom-line .tag.crit {
+  border-left-color: var(--crit);
+}
+.bottom-line .jump {
+  justify-content: flex-start;
+  margin-top: 12px;
+  font-size: 12px;
+}
+.card,
+.help article h2 {
+  scroll-margin-top: 10px;
 }
 
 /* driver.js dark theme */
@@ -1096,7 +1257,7 @@ table.data tr:hover td {
   color: var(--muted) !important;
 }
 .tour-popover {
-  max-width: 420px !important;
+  max-width: min(420px, calc(100vw - 16px)) !important;
   width: 420px !important;
 }
 .tour-popover .driver-popover-description {
@@ -1122,4 +1283,133 @@ code {
   padding: 1px 5px;
   border-radius: 4px;
   font-size: 12px;
+}
+
+/* ---------- narrower laptops ---------- */
+@media (max-width: 1100px) {
+  :root {
+    --sidebar-w: 320px;
+  }
+  .topbar {
+    gap: 8px;
+    padding: 0 10px;
+  }
+  .tabs {
+    margin-left: 4px;
+  }
+  .tab {
+    padding: 6px 9px;
+  }
+  .brand .name {
+    display: none;
+  }
+}
+
+/* ---------- phones: map on top, panel underneath, tabs on their own scrolling row ---------- */
+@media (max-width: 760px) {
+  .app {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .topbar {
+    flex-wrap: wrap;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .topbar .spacer {
+    display: none;
+  }
+  .search {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .tabs {
+    order: 3;
+    flex: 0 0 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .tabs .tt {
+    flex: none;
+  }
+  .tab {
+    white-space: nowrap;
+    padding: 7px 7px;
+  }
+  .main,
+  .main.collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 46% minmax(0, 1fr);
+  }
+  .main.collapsed {
+    grid-template-rows: minmax(0, 1fr) 34px;
+  }
+  .main.full {
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .main .map-col {
+    order: 1;
+  }
+  .main .sidebar {
+    order: 2;
+    border-right: 0;
+    border-top: 1px solid var(--border);
+  }
+  .verdict-banner {
+    left: 8px;
+    right: 8px;
+    top: 44px;
+    max-width: none;
+    padding: 6px 10px;
+  }
+  .verdict-banner .vb-sub {
+    display: none;
+  }
+  .map-tools {
+    right: 48px;
+    top: 8px;
+  }
+  .map-drawer {
+    left: 8px;
+    right: 8px;
+    top: 42px;
+    width: auto;
+    max-height: calc(100% - 50px);
+  }
+  .legend {
+    max-width: 210px;
+    max-height: 60%;
+    bottom: 26px;
+    right: 8px;
+  }
+  .map-status {
+    left: 8px;
+    bottom: 30px;
+    max-width: calc(100% - 70px);
+  }
+  .analytics {
+    padding: 10px 10px 60px;
+  }
+  .bottom-line li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .page-col {
+    padding: 8px 10px;
+  }
+  .help {
+    padding: 12px 12px 60px;
+  }
+  .help dl {
+    grid-template-columns: 1fr;
+  }
+  .learn .subtabs {
+    padding: 8px 12px 0;
+  }
+  .welcome {
+    bottom: 16px;
+  }
 }

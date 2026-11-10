@@ -5,10 +5,10 @@ A map-based, static (GitHub Pages) simulator for testing where new EV charging l
 ## What it does
 
 - **Map** (Mapbox GL) of the Con Edison territory with live layers from Con Edison's public hosting-capacity ArcGIS services: EV transformers (summer/winter), EV feeders, 33 kV feeders, network structures, M&S plates, networks (LSRV), NWS networks, disadvantaged communities; NYC **MapPLUTO** attributes joined to **Building Footprints**; **Census tracts** with ACS demographics.
-- **Site simulation**: search an address (or click the map / shift-click a building), set charger mix (L2 7–19 kW, DCFC 50–350 kW), use profile, utilization, diversity, managed charging and storage. Nearby transformers, feeders, M&S plates, structures and the network get a green / amber / red status against published headroom.
+- **Site simulation**: search an address (or click the map / shift-click a building), set charger mix (L2 7–19 kW, DCFC 50–350 kW), use profile, utilization, diversity, managed charging and storage. Nearby transformers, feeders, M&S plates, structures and the network get a green / amber / red light (fits / tight / doesn't fit) against published headroom; drag a pin to re-check another spot.
 - **Outlook tab** (borough-wide adoption): EV fleet share by year (2024–2045) on policy / moderate / slow / custom curves, converted to coincident peak kW per tract and aggregated to networks.
-- **Results tab**: hourly load, asset loading, cost & incentive breakdown, adoption curves, network stress table, scenario comparison, CSV/PNG export.
-- **Missions**, a **guided tour**, hover **tooltips** on every control, and an illustrated guide + jargon decoder in the **Learn** tab.
+- **Results tab**: a plain-English bottom line (load, fit, cost vs budget, equity, outlook), one-click snapshot-and-compare, hourly load, asset loading, cost & incentive breakdown, adoption curves, network stress table, scenario comparison, CSV/PNG export.
+- **Missions**, an opt-in **guided tour**, hover **tooltips** on every control, and an illustrated guide + jargon decoder in the **Learn** tab.
 - Scenarios persist in the browser and can be shared as a URL.
 
 ## Run locally

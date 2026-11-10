@@ -73,6 +73,8 @@ export interface LiveData {
   feeders33kv: FC<LineString | MultiLineString>;
   loading: Record<string, boolean>;
   errors: Record<string, string | undefined>;
+  /** Cover keys of the sites whose surrounding equipment has finished loading (see `coverKey`). */
+  covered: string[];
 }
 
 const emptyFC = <T,>() => ({ type: 'FeatureCollection', features: [] }) as unknown as T;
@@ -104,6 +106,8 @@ export interface AppState {
   missionsDone: string[];
   analyticsVisited: boolean;
   toast: string | null;
+  /** What the Undo button on the current toast would restore. */
+  undo: { label: string; scenario: Scenario; saved: Scenario[]; selectedSiteId: string | null; compareId: string | null } | null;
 
   // actions
   setTab: (t: Tab) => void;
@@ -114,6 +118,9 @@ export interface AppState {
   addSite: (s: Site) => void;
   updateSite: (id: string, patch: Partial<Site>) => void;
   removeSite: (id: string) => void;
+  moveSite: (id: string, lng: number, lat: number) => void;
+  undoLast: () => void;
+  pinBaseline: () => void;
   selectSite: (id: string | null) => void;
   setPlacing: (b: boolean) => void;
   setArea: (patch: Partial<AreaScenario>) => void;
@@ -136,7 +143,7 @@ export interface AppState {
   setViewport: (v: { center: [number, number]; zoom: number }) => void;
   requestFlyTo: (center: [number, number], zoom: number) => void;
   requestTour: (b: boolean) => void;
-  completeMission: (id: string) => void;
+  completeMission: (id: string, title?: string) => void;
   resetMissions: () => void;
   setToast: (m: string | null) => void;
 }
@@ -148,6 +155,12 @@ function initialScenario(): Scenario {
   if (active && Array.isArray((active as any).sites)) return active;
   return defaultScenario();
 }
+
+/** Remember the state an action is about to change, and announce it in a toast that carries an Undo button. */
+const undoable = (s: AppState, label: string): Pick<AppState, 'undo' | 'toast'> => ({
+  undo: { label, scenario: s.scenario, saved: s.saved, selectedSiteId: s.selectedSiteId, compareId: s.compareId },
+  toast: label,
+});
 
 export const useStore = create<AppState>((set, get) => ({
   scenario: initialScenario(),
@@ -167,12 +180,13 @@ export const useStore = create<AppState>((set, get) => ({
   exclusiveLayers: load<{ exclusiveLayers: boolean }>(LS_UI, { exclusiveLayers: false }).exclusiveLayers,
   filters: UI0.sites.filters,
   staticData: {},
-  live: { transformers: emptyFC(), feeders: emptyFC(), structures: emptyFC(), buildings: emptyFC(), feeders33kv: emptyFC(), loading: {}, errors: {} },
+  live: { transformers: emptyFC(), feeders: emptyFC(), structures: emptyFC(), buildings: emptyFC(), feeders33kv: emptyFC(), loading: {}, errors: {}, covered: [] },
   viewport: { center: [-73.9, 40.75], zoom: 11 },
   flyTo: null,
   missionsDone: loadList<string>(LS_MISSIONS),
   analyticsVisited: false,
   toast: null,
+  undo: null,
 
   setTab: (tab) =>
     set((s) => {
@@ -199,7 +213,33 @@ export const useStore = create<AppState>((set, get) => ({
   updateSite: (id, patch) =>
     set((s) => ({ scenario: { ...s.scenario, sites: s.scenario.sites.map((x) => (x.id === id ? { ...x, ...patch } : x)) } })),
   removeSite: (id) =>
-    set((s) => ({ scenario: { ...s.scenario, sites: s.scenario.sites.filter((x) => x.id !== id) }, selectedSiteId: s.selectedSiteId === id ? null : s.selectedSiteId })),
+    set((s) => {
+      const site = s.scenario.sites.find((x) => x.id === id);
+      if (!site) return {};
+      return {
+        ...undoable(s, `Removed “${site.name}”`),
+        scenario: { ...s.scenario, sites: s.scenario.sites.filter((x) => x.id !== id) },
+        selectedSiteId: s.selectedSiteId === id ? null : s.selectedSiteId,
+      };
+    }),
+  moveSite: (id, lng, lat) =>
+    set((s) => {
+      const site = s.scenario.sites.find((x) => x.id === id);
+      if (!site) return {};
+      return {
+        ...undoable(s, `Moved “${site.name}” — re-checking the grid`),
+        scenario: { ...s.scenario, sites: s.scenario.sites.map((x) => (x.id === id ? { ...x, lng, lat, address: undefined, bbl: undefined } : x)) },
+      };
+    }),
+  undoLast: () =>
+    set((s) => (s.undo ? { scenario: s.undo.scenario, saved: s.undo.saved, selectedSiteId: s.undo.selectedSiteId, compareId: s.undo.compareId, undo: null, toast: 'Undone' } : {})),
+  /** Freeze the current numbers as a saved snapshot and compare against it, so the next change shows up side by side. */
+  pinBaseline: () =>
+    set((s) => {
+      const time = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      const snap: Scenario = { ...structuredClone(s.scenario), id: uid(), name: `${s.scenario.name} · snapshot ${time}`, createdAt: Date.now() };
+      return { saved: [...s.saved, snap], compareId: snap.id, toast: 'Snapshot saved — change something and the difference shows here' };
+    }),
   selectSite: (selectedSiteId) => set({ selectedSiteId }),
   setPlacing: (placing) => set({ placing }),
   setArea: (patch) => set((s) => ({ scenario: { ...s.scenario, area: { ...s.scenario.area, ...patch } } })),
@@ -218,15 +258,25 @@ export const useStore = create<AppState>((set, get) => ({
   },
   loadScenario: (id) => {
     const found = get().saved.find((x) => x.id === id);
-    if (found) set({ scenario: structuredClone(found), selectedSiteId: null, toast: `Loaded "${found.name}"` });
+    if (found) set((s) => ({ ...undoable(s, `Loaded “${found.name}”`), scenario: structuredClone(found), selectedSiteId: null }));
   },
-  deleteScenario: (id) => set((s) => ({ saved: s.saved.filter((x) => x.id !== id), compareId: s.compareId === id ? null : s.compareId })),
+  deleteScenario: (id) =>
+    set((s) => {
+      const found = s.saved.find((x) => x.id === id);
+      if (!found) return {};
+      return { ...undoable(s, `Deleted saved scenario “${found.name}”`), saved: s.saved.filter((x) => x.id !== id), compareId: s.compareId === id ? null : s.compareId };
+    }),
+  // Duplicate = keep the original (saved) and carry on in a copy, so nothing is lost
   newScenario: () =>
-    set((s) => ({
-      scenario: { ...structuredClone(s.scenario), id: uid(), name: `${s.scenario.name} (copy)`, createdAt: Date.now() },
-      toast: 'Duplicated scenario — edit freely',
-    })),
-  resetToDefault: () => set({ scenario: defaultScenario(), selectedSiteId: null, toast: 'Reset to baseline scenario' }),
+    set((s) => {
+      const original: Scenario = { ...structuredClone(s.scenario), createdAt: Date.now() };
+      return {
+        saved: [...s.saved.filter((x) => x.id !== original.id), original],
+        scenario: { ...structuredClone(s.scenario), id: uid(), name: `${s.scenario.name} (copy)`, createdAt: Date.now() },
+        toast: `Saved “${original.name}” and started a copy`,
+      };
+    }),
+  resetToDefault: () => set((s) => ({ ...undoable(s, 'Reset to the baseline scenario'), scenario: defaultScenario(), selectedSiteId: null })),
   importScenario: (scenario) => set({ scenario, selectedSiteId: null }),
   setCompare: (compareId) => set({ compareId }),
   setStatic: (d) => set((s) => ({ staticData: { ...s.staticData, ...d } })),
@@ -234,9 +284,9 @@ export const useStore = create<AppState>((set, get) => ({
   setViewport: (viewport) => set({ viewport }),
   requestFlyTo: (center, zoom) => set({ flyTo: { center, zoom, nonce: Date.now() } }),
   requestTour: (tourRequested) => set({ tourRequested }),
-  completeMission: (id) => set((s) => (s.missionsDone.includes(id) ? {} : { missionsDone: [...s.missionsDone, id], toast: `Mission complete: ${id}` })),
+  completeMission: (id, title) => set((s) => (s.missionsDone.includes(id) ? {} : { missionsDone: [...s.missionsDone, id], toast: `Mission complete: ${title ?? id}` })),
   resetMissions: () => set({ missionsDone: [] }),
-  setToast: (toast) => set({ toast }),
+  setToast: (toast) => set((s) => ({ toast, undo: toast === null ? null : s.undo })),
 }));
 
 // Persist slices

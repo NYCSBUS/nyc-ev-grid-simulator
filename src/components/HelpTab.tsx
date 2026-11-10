@@ -250,19 +250,19 @@ export function HelpTab() {
         </p>
         <ol>
           <li>
-            <b>Pick a spot.</b> In the <i>Sites</i> tab, search an address in the top bar, click <i>Add a site</i>, or shift-click a building. A charging site appears with a starter set of chargers.
+            <b>Pick a spot.</b> In the <i>Sites</i> tab, search an address in the top bar, click <i>Add a site</i>, or shift-click a building. A charging site appears with a starter set of chargers. Drag its pin to try the corner next door.
           </li>
           <li>
             <b>Describe the site</b> in the left panel: how many chargers, what kind of place it is, whether charging is smart, whether there is a battery.
           </li>
           <li>
-            <b>Read the traffic lights.</b> Every nearby piece of grid equipment gets a green, amber or red light.
+            <b>Read the traffic lights.</b> Every nearby piece of grid equipment gets a light: green = <i>fits</i>, amber = <i>tight</i>, red = <i>doesn’t fit</i>. (The blue-to-violet dots and lines on the map are a different thing: how much room that equipment has <i>today</i>, before your site.)
           </li>
           <li>
             <b>Zoom out</b> in the <i>Outlook</i> tab to see how a whole borough's EV growth lands on the grid in any year to 2045.
           </li>
           <li>
-            <b>Open Results</b> for charts, tables and costs. <i>Scenarios</i> saves, shares and compares versions.
+            <b>Open Results</b> for the bottom line in plain sentences, then charts, tables and costs. <i>Snapshot &amp; compare</i> there freezes today’s numbers so your next change shows up as before and after. <i>Scenarios</i> saves and shares versions.
           </li>
         </ol>
         <div className="callout">
@@ -333,15 +333,15 @@ export function HelpTab() {
         <h2 id="help-status">What each colour means</h2>
         <dl>
           <dt>
-            <span className="pill ok">OK</span>
+            <span className="pill ok">Fits</span>
           </dt>
           <dd>Your site uses less than the amber line (60 %) of the room left. A routine connection is likely.</dd>
           <dt>
-            <span className="pill warn">Watch</span>
+            <span className="pill warn">Tight</span>
           </dt>
           <dd>Between the amber and red lines. Expect Con Edison to study it closely and possibly ask for smart charging, a battery, or a phased build.</dd>
           <dt>
-            <span className="pill crit">Critical</span>
+            <span className="pill crit">Doesn’t fit</span>
           </dt>
           <dd>Your site needs more than the room left. Either Con Edison installs bigger equipment (and the cost section adds an allowance for that) or you pick another spot.</dd>
           <dt>
@@ -349,7 +349,14 @@ export function HelpTab() {
           </dt>
           <dd>The equipment is nearby but Con Edison has not published a number for it, or your site's load was not assigned to it.</dd>
         </dl>
-        <p>A site's overall colour is its worst light. The map outlines every piece of equipment it checked in that colour; click one to see Con Edison's raw figures.</p>
+        <p>
+          A site's overall colour is its worst light. The map outlines every piece of equipment it checked in that colour; click one to see Con Edison's raw figures. Until the equipment
+          around a site has loaded, the site shows <i>Checking…</i> rather than a colour.
+        </p>
+        <p>
+          Green, amber and red are used <b>only</b> for these lights. The map’s other shading uses its own scales so the two are never confused: pale blue → violet for how much room
+          equipment has today (pale = lots), and purple for borough-wide EV growth in the Outlook tab (brighter = more).
+        </p>
 
         <h2 id="help-equity">Disadvantaged communities</h2>
         <p>

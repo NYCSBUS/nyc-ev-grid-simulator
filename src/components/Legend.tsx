@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../state/store';
-import { ACS_VARS } from './MapView';
+import { ACS_VARS, GROWTH_RAMP, ROOM_COLORS } from './MapView';
 import type { LayerVisibility, Thresholds } from '../types';
 import { MIN_ZOOM } from '../config';
 
@@ -8,7 +8,8 @@ export function Legend({ thresholds, areaActive, layers: raw, zoom }: { threshol
   // only describe what is actually drawn at this zoom
   const layers: LayerVisibility = { ...raw, transformers: raw.transformers && zoom >= MIN_ZOOM.transformers, feeders: raw.feeders && zoom >= MIN_ZOOM.feeders, buildings: raw.buildings && zoom >= MIN_ZOOM.buildings };
   const filters = useStore((s) => s.filters);
-  const [open, setOpen] = useState(true);
+  // on a phone the legend would cover the map, so it starts folded away
+  const [open, setOpen] = useState(() => window.innerWidth > 760);
   const anyAsset = layers.transformers || layers.feeders || layers.msplates || layers.buildings || layers.dac || layers.networks;
   if (!anyAsset && !areaActive && !layers.sites) return null;
   if (!open)
@@ -23,81 +24,70 @@ export function Legend({ thresholds, areaActive, layers: raw, zoom }: { threshol
     <div className="map-overlay legend" id="tour-legend">
       <div className="row between">
         <h4>Legend</h4>
-        <button className="btn small" onClick={() => setOpen(false)}>
+        <button className="btn small" onClick={() => setOpen(false)} aria-label="Hide legend">
           ×
         </button>
       </div>
       {layers.sites && (
         <>
+          <h4>Your site’s effect (traffic lights)</h4>
           <div className="item">
-            <span className="sw dot" style={{ background: '#22c55e' }} /> Green: uses &lt; {Math.round(thresholds.warn * 100)}% of room left
+            <span className="sw dot" style={{ background: '#22c55e' }} /> Fits — uses under {Math.round(thresholds.warn * 100)}% of the room left
           </div>
           <div className="item">
-            <span className="sw dot" style={{ background: '#f59e0b' }} /> Amber: {Math.round(thresholds.warn * 100)}–{Math.round(thresholds.crit * 100)}%
+            <span className="sw dot" style={{ background: '#f59e0b' }} /> Tight — {Math.round(thresholds.warn * 100)}–{Math.round(thresholds.crit * 100)}%
           </div>
           <div className="item">
-            <span className="sw dot" style={{ background: '#ef4444' }} /> Red: ≥ {Math.round(thresholds.crit * 100)}% (over the line)
+            <span className="sw dot" style={{ background: '#ef4444' }} /> Doesn’t fit — {Math.round(thresholds.crit * 100)}% or more
+          </div>
+        </>
+      )}
+      {(layers.transformers || layers.feeders || layers.msplates) && (
+        <>
+          <h4 style={{ marginTop: 8 }}>Room left on the grid today</h4>
+          <div className="ramp" style={{ background: `linear-gradient(90deg,${ROOM_COLORS.join(',')})` }} />
+          <div className="row between muted">
+            <span>little</span>
+            <span>lots</span>
           </div>
         </>
       )}
       {layers.transformers && (
-        <>
-          <h4 style={{ marginTop: 8 }}>Transformers — room left</h4>
-          <div className="item">
-            <span className="sw dot" style={{ background: '#22c55e' }} /> &gt; 1000 kVA (lots)
-          </div>
-          <div className="item">
-            <span className="sw dot" style={{ background: '#84cc16' }} /> 500–1000 kVA
-          </div>
-          <div className="item">
-            <span className="sw dot" style={{ background: '#f59e0b' }} /> 200–499 kVA
-          </div>
-          <div className="item">
-            <span className="sw dot" style={{ background: '#ef4444' }} /> &lt; 200 kVA (nearly full)
-          </div>
-          <div className="item">
-            <span className="sw dot" style={{ background: '#64748b', border: '2px solid #fff' }} /> white ring = 460 V (fast-charger type)
-          </div>
-        </>
+        <div className="item">
+          <span className="sw dot" style={{ background: ROOM_COLORS[0] }} />
+          <span className="sw dot" style={{ background: ROOM_COLORS[1] }} />
+          <span className="sw dot" style={{ background: ROOM_COLORS[2] }} />
+          <span className="sw dot" style={{ background: ROOM_COLORS[3] }} /> Transformers, under 200 → over 1,000 kVA
+        </div>
+      )}
+      {layers.transformers && (
+        <div className="item">
+          <span className="sw dot" style={{ background: ROOM_COLORS[2], border: '2px solid #fff' }} /> white ring = 460 V (fast-charger type)
+        </div>
       )}
       {layers.feeders && (
-        <>
-          <h4 style={{ marginTop: 8 }}>Street mains — room left for EVs</h4>
-          <div className="item">
-            <span className="sw line" style={{ background: '#22c55e' }} /> ≥ 5 MW
-          </div>
-          <div className="item">
-            <span className="sw line" style={{ background: '#84cc16' }} /> 2–5 MW
-          </div>
-          <div className="item">
-            <span className="sw line" style={{ background: '#f59e0b' }} /> 0.5–2 MW
-          </div>
-          <div className="item">
-            <span className="sw line" style={{ background: '#ef4444' }} /> &lt; 0.5 MW
-          </div>
-        </>
+        <div className="item">
+          <span className="sw line" style={{ background: ROOM_COLORS[0] }} />
+          <span className="sw line" style={{ background: ROOM_COLORS[3] }} /> Street mains, under 0.5 → over 5 MW
+        </div>
       )}
       {layers.msplates && (
-        <>
-          <h4 style={{ marginTop: 8 }}>Underground map sheets — room left (kVA)</h4>
-          <div className="ramp" style={{ background: 'linear-gradient(90deg,#ef4444,#f59e0b,#84cc16,#22c55e)' }} />
-          <div className="row between muted">
-            <span>0</span>
-            <span>5,000+</span>
-          </div>
-        </>
+        <div className="item">
+          <span className="sw" style={{ background: ROOM_COLORS[0] }} />
+          <span className="sw" style={{ background: ROOM_COLORS[3] }} /> Map sheets, 0 → over 5,000 kVA
+        </div>
       )}
       {layers.buildings && (
         <>
           <h4 style={{ marginTop: 8 }}>Buildings — what they are used for</h4>
           <div className="item">
-            <span className="sw" style={{ background: '#fde68a' }} /> Houses (1–2 family)
+            <span className="sw" style={{ background: '#e9dcb8' }} /> Houses (1–2 family)
           </div>
           <div className="item">
-            <span className="sw" style={{ background: '#f59e0b' }} /> Apartment buildings
+            <span className="sw" style={{ background: '#c8a27a' }} /> Apartment buildings
           </div>
           <div className="item">
-            <span className="sw" style={{ background: '#f87171' }} /> Shops & offices
+            <span className="sw" style={{ background: '#d98fb0' }} /> Shops & offices
           </div>
           <div className="item">
             <span className="sw" style={{ background: '#a78bfa' }} /> Industrial
@@ -120,13 +110,13 @@ export function Legend({ thresholds, areaActive, layers: raw, zoom }: { threshol
       {areaActive && (
         <>
           <h4 style={{ marginTop: 8 }}>Borough-wide growth: extra rush-hour kW per km²</h4>
-          <div className="ramp" style={{ background: 'linear-gradient(90deg,#1d4ed8,#0ea5e9,#facc15,#f97316,#ef4444)' }} />
+          <div className="ramp" style={{ background: `linear-gradient(90deg,${GROWTH_RAMP.join(',')})` }} />
           <div className="row between muted">
             <span>low</span>
             <span>high (quintiles)</span>
           </div>
           <div className="muted" style={{ marginTop: 4 }}>
-            Grid-zone fill = traffic light vs published capacity
+            Grid-zone outline and fill = traffic light: green fits, amber tight, red over the published capacity
           </div>
         </>
       )}

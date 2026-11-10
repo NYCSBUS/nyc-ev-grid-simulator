@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import type * as echarts from 'echarts';
 import { useStore } from '../state/store';
 import { assessScenario, useAreaResult, useAssessments, useSiteContext, useAreaIndex } from '../state/hooks';
@@ -7,9 +7,17 @@ import { nameplateKw, portCount } from '../sim/model';
 import { runArea } from '../sim/area';
 import type { AreaResult, Scenario, SiteAssessment, Status } from '../types';
 import { Chart, downloadCsv, downloadPng } from './Chart';
-import { Help, STATUS_COLOR, StatusDot, StatusPill, fmt } from './ui';
+import { Help, STATUS_COLOR, StatusDot, StatusPill, Tip, fmt } from './ui';
+import { VERDICT_WORD, friendlyAsset, roomPhrase, verdictFor } from '../sim/verdict';
 
 const HOURS = Array.from({ length: 24 }, (_, h) => `${h}:00`);
+const hourLabel = (h: number) => `${h % 12 || 12} ${h >= 12 ? 'PM' : 'AM'}`;
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+/** "120 kW lower" / "$0.20M higher" / "the same" — b is the baseline being compared against. */
+function delta(now: number, base: number, f: (v: number) => string, tiny = 0.5) {
+  const d = now - base;
+  return Math.abs(d) < tiny ? 'the same' : `${f(Math.abs(d))} ${d > 0 ? 'higher' : 'lower'}`;
+}
 
 function summarize(sc: Scenario, as: Map<string, SiteAssessment>) {
   const sites = sc.sites;
@@ -20,13 +28,23 @@ function summarize(sc: Scenario, as: Map<string, SiteAssessment>) {
   const coincident = hourly[sc.settings.peakHour] ?? 0;
   const peak = Math.max(0, ...hourly);
   const annualMwh = sites.reduce((s, x) => s + (as.get(x.id)?.annualMwh ?? 0), 0);
-  const assets = sites.flatMap((x) => as.get(x.id)?.assets ?? []);
+  // a site whose surrounding equipment has not loaded yet has no lights to count
+  const checked = sites.filter((x) => as.get(x.id) && !as.get(x.id)!.provisional);
+  const pending = sites.length - checked.length;
+  const assets = checked.flatMap((x) => as.get(x.id)!.assets);
   const crit = assets.filter((a) => a.status === 'crit').length;
   const warn = assets.filter((a) => a.status === 'warn').length;
   const cost = sites.reduce((s, x) => s + (as.get(x.id)?.cost.total ?? 0), 0);
   const incentive = sites.reduce((s, x) => s + (as.get(x.id)?.cost.incentive ?? 0), 0);
   const dacSites = sites.filter((x) => as.get(x.id)?.inDac).length;
-  return { nameplate, ports, hourly, unmanaged, coincident, peak, annualMwh, crit, warn, cost, incentive, dacSites, assets };
+  const levels = { fits: 0, tight: 0, nofit: 0, nodata: 0 };
+  let tightest: { site: string; asset: SiteAssessment['assets'][number] } | null = null;
+  for (const x of checked) {
+    const v = verdictFor(as.get(x.id));
+    if (v.level !== 'unknown') levels[v.level]++;
+    if (v.tightest && (v.tightest.ratio ?? 0) > (tightest?.asset.ratio ?? -1)) tightest = { site: x.name, asset: v.tightest };
+  }
+  return { nameplate, ports, hourly, unmanaged, coincident, peak, annualMwh, crit, warn, cost, incentive, dacSites, assets, pending, levels, tightest };
 }
 
 export function AnalyticsTab() {
@@ -34,6 +52,8 @@ export function AnalyticsTab() {
   const saved = useStore((s) => s.saved);
   const compareId = useStore((s) => s.compareId);
   const setCompare = useStore((s) => s.setCompare);
+  const pinBaseline = useStore((s) => s.pinBaseline);
+  const setSettings = useStore((s) => s.setSettings);
   const requestFlyTo = useStore((s) => s.requestFlyTo);
   const setTab = useStore((s) => s.setTab);
   const selectSite = useStore((s) => s.selectSite);
@@ -108,19 +128,20 @@ export function AnalyticsTab() {
   const assetRows = useMemo(
     () =>
       scenario.sites.flatMap((s) =>
-        (assessments.get(s.id)?.assets ?? [])
+        (assessments.get(s.id)?.provisional ? [] : assessments.get(s.id)?.assets ?? [])
           .filter((a) => a.ratio != null)
           .map((a) => ({ site: s.name, siteId: s.id, ...a })),
       ),
     [scenario.sites, assessments],
   );
   const assetOpt = useMemo<echarts.EChartsOption>(() => {
+    const narrow = window.innerWidth < 760;
     const rows = [...assetRows].sort((a, b) => (b.ratio ?? 0) - (a.ratio ?? 0)).slice(0, 20);
     return {
-      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => `${p[0].name}<br/>${fmt.pct(p[0].value / 100)} of headroom` },
-      grid: { left: 240, right: 40, top: 10, bottom: 30 },
-      xAxis: { type: 'value', name: '% of headroom', max: 150, axisLabel: { color: '#9aa7b4' }, splitLine: { lineStyle: { color: '#2b3542' } } },
-      yAxis: { type: 'category', inverse: true, data: rows.map((r) => `${r.site} → ${r.name}`.slice(0, 48)), axisLabel: { color: '#cbd5e1', fontSize: 11 } },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p: any) => `${p[0].name}<br/>uses ${fmt.fill(rows[p[0].dataIndex]?.ratio)} of its room` },
+      grid: { left: narrow ? 120 : 240, right: 40, top: 10, bottom: 40 },
+      xAxis: { type: 'value', name: '% of room used', nameLocation: 'middle', nameGap: 22, max: 150, axisLabel: { color: '#9aa7b4' }, splitLine: { lineStyle: { color: '#2b3542' } } },
+      yAxis: { type: 'category', inverse: true, data: rows.map((r) => (narrow ? r.name.slice(0, 18) : `${r.site} → ${r.name}`.slice(0, 48))), axisLabel: { color: '#cbd5e1', fontSize: 11 } },
       series: [
         {
           type: 'bar',
@@ -128,8 +149,8 @@ export function AnalyticsTab() {
           markLine: {
             symbol: 'none',
             data: [
-              { xAxis: scenario.settings.thresholds.warn * 100, lineStyle: { color: '#f59e0b' }, label: { formatter: 'watch' } },
-              { xAxis: scenario.settings.thresholds.crit * 100, lineStyle: { color: '#ef4444' }, label: { formatter: 'critical' } },
+              { xAxis: scenario.settings.thresholds.warn * 100, lineStyle: { color: '#f59e0b' }, label: { formatter: 'tight', color: '#f59e0b' } },
+              { xAxis: scenario.settings.thresholds.crit * 100, lineStyle: { color: '#ef4444' }, label: { formatter: "doesn't fit", color: '#ef4444' } },
             ],
           },
         },
@@ -166,7 +187,7 @@ export function AnalyticsTab() {
         axisPointer: { type: 'shadow' },
         formatter: (p: any) => {
           const r = rows[p[0].dataIndex];
-          return `<b>${r.network}</b> (${r.borough})<br/>Added EV load: ${fmt.mw(r.addedMw)}<br/>Network capacity range: ${r.capacityRange ?? '—'} MW (mid ${r.capacityMw ?? '—'})<br/>EVs: ${fmt.int(r.evs)}<br/>Ratio: ${fmt.pct(r.ratio)}`;
+          return `<b>${r.network}</b> (${r.borough})<br/>Added EV load: ${fmt.mw(r.addedMw)}<br/>Network capacity range: ${r.capacityRange ?? '—'} MW (mid ${r.capacityMw ?? '—'})<br/>EVs: ${fmt.int(r.evs)}<br/>How full: ${fmt.fill(r.ratio)}`;
         },
       },
       legend: { top: 0, textStyle: { color: '#9aa7b4' } },
@@ -227,6 +248,108 @@ export function AnalyticsTab() {
 
   const netRows = useMemo(() => (area ? [...area.networkStats].sort((a, b) => ((b as any)[netSort] ?? -1) - ((a as any)[netSort] ?? -1)) : []), [area, netSort]);
 
+  // ---------- the answer, in sentences ----------
+  const lines = useMemo(() => {
+    const out: Array<{ k: string; tone?: Status; body: ReactNode }> = [];
+    const n = scenario.sites.length;
+    if (n) {
+      out.push({
+        k: 'Load',
+        body: (
+          <>
+            {n === 1 ? 'Your site' : `Your ${n} sites`} ({plural(sum.ports, 'plug')}) add <b>{fmt.kw(sum.coincident)}</b> at the {hourLabel(peakHour)} grid rush — {fmt.pct(sum.coincident / Math.max(1, sum.nameplate))} of the {fmt.kw(sum.nameplate)} sticker rating.
+          </>
+        ),
+      });
+      const { fits, tight, nofit, nodata } = sum.levels;
+      const parts = [fits && `${fits} fit${fits === 1 ? 's' : ''}`, tight && `${tight} ${tight === 1 ? 'is' : 'are'} tight`, nofit && `${nofit} ${nofit === 1 ? "doesn't" : "don't"} fit`, nodata && `${nodata} ${nodata === 1 ? 'has' : 'have'} no grid data nearby`].filter(Boolean) as string[];
+      out.push({
+        k: 'Grid',
+        tone: nofit ? 'crit' : tight ? 'warn' : fits ? 'ok' : 'unknown',
+        body: (
+          <>
+            {parts.length ? <b>{parts.join(', ')}.</b> : null}{' '}
+            {sum.tightest && (
+              <>
+                Tightest spot: {sum.tightest.site} → {friendlyAsset(sum.tightest.asset)}, where the site uses {roomPhrase(sum.tightest.asset)}.{' '}
+              </>
+            )}
+            {sum.pending > 0 && <span className="muted">{plural(sum.pending, 'site')} still being checked — open {sum.pending === 1 ? 'it' : 'them'} on the map so the grid around {sum.pending === 1 ? 'it' : 'them'} loads.</span>}
+          </>
+        ),
+      });
+      const net = sum.cost - sum.incentive;
+      const budget = scenario.settings.budget;
+      out.push({
+        k: 'Cost',
+        tone: budget ? (net > budget ? 'crit' : 'ok') : undefined,
+        body: (
+          <>
+            About <b>{fmt.usd(sum.cost)}</b> to build; grants cover {fmt.usd(sum.incentive)} ({fmt.pct(sum.cost ? sum.incentive / sum.cost : 0)}), leaving <b>{fmt.usd(net)}</b> to pay.{' '}
+            {budget ? (
+              <b>
+                That is {fmt.usd(Math.abs(budget - net))} {net > budget ? 'over' : 'under'} your {fmt.usd(budget)} budget.
+              </b>
+            ) : (
+              <span className="muted">Enter a budget above to check it.</span>
+            )}
+          </>
+        ),
+      });
+      const share = sum.dacSites / n;
+      out.push({
+        k: 'Equity',
+        tone: share >= 0.35 ? 'ok' : 'warn',
+        body:
+          n === 1 ? (
+            <>Your site is {sum.dacSites ? '' : 'not '}in a Disadvantaged Community{sum.dacSites ? ', so it gets the larger grant rate' : ''}.</>
+          ) : (
+            <>
+              <b>
+                {sum.dacSites} of {n}
+              </b>{' '}
+              sites ({fmt.pct(share)}) are in Disadvantaged Communities — {share >= 0.35 ? 'at or above' : 'short of'} the State’s 35 % goal.
+            </>
+          ),
+      });
+    } else {
+      out.push({ k: 'Sites', body: <>No charging sites yet. Add one on the Sites tab and the answer appears here.</> });
+    }
+    if (area) {
+      const zones = area.networkStats.filter((z) => z.evs > 0);
+      const over = zones.filter((z) => z.status === 'crit');
+      const top = [...zones].sort((a, b) => (b.ratio ?? 0) - (a.ratio ?? 0))[0];
+      out.push({
+        k: `Outlook ${area.year}`,
+        tone: over.length ? 'crit' : zones.some((z) => z.status === 'warn') ? 'warn' : 'ok',
+        body: (
+          <>
+            About {fmt.int(area.totalEvs)} EVs ({fmt.pct(area.evShare, 1)} of cars) add <b>{fmt.mw(area.totalAddedMw)}</b> at rush hour.{' '}
+            <b>
+              {over.length} of {plural(zones.length, 'grid zone')} {over.length === 1 ? 'goes' : 'go'} over capacity
+            </b>
+            {top ? ` — most stretched: ${top.network} (${fmt.fill(top.ratio)} of its published capacity).` : '.'}
+          </>
+        ),
+      });
+    }
+    if (compare && sumB) {
+      const redNow = sum.crit;
+      const redWas = sumB.crit;
+      out.push({
+        k: 'Change',
+        body: (
+          <>
+            Against “{compare.name}”: rush-hour load is <b>{delta(sum.coincident, sumB.coincident, fmt.kw)}</b>, what you pay is <b>{delta(sum.cost - sum.incentive, sumB.cost - sumB.incentive, fmt.usd, 500)}</b>, and {redNow === redWas ? 'the same number of' : <b>{plural(Math.abs(redNow - redWas), redNow > redWas ? 'more' : 'fewer', redNow > redWas ? 'more' : 'fewer')}</b>} pieces of equipment are in the red ({redWas} → {redNow}).
+          </>
+        ),
+      });
+    }
+    return out;
+  }, [scenario.sites.length, scenario.settings.budget, sum, sumB, area, compare, peakHour]);
+
+  const jump = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
   const Kpi = ({ label, value, sub, help, b }: { label: string; value: string; sub?: string; help?: string; b?: string }) => (
     <div className="kpi">
       <div className="label">
@@ -245,9 +368,14 @@ export function AnalyticsTab() {
           Results · {scenario.name}
           {compare && <span className="muted" style={{ fontSize: 13 }}> vs {compare.name}</span>}
         </h2>
-        <div className="row">
-          <select value={compareId ?? ''} onChange={(e) => setCompare(e.target.value || null)} style={{ background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px' }} title="Compare with a saved scenario">
-            <option value="">Compare with a saved scenario…</option>
+        <div className="row wrap">
+          <Tip text="Freezes today's numbers as a saved snapshot and compares against it. Then go and change something — smart charging, a battery, a different corner — and every figure here shows before and after.">
+            <button className="btn primary" id="tour-snapshot" onClick={pinBaseline}>
+              Snapshot &amp; compare
+            </button>
+          </Tip>
+          <select value={compareId ?? ''} onChange={(e) => setCompare(e.target.value || null)} aria-label="Compare with a saved scenario" style={{ background: 'var(--panel-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 8px', maxWidth: 240 }} title="Compare with a saved scenario">
+            <option value="">{compareId ? 'Stop comparing' : 'Compare with a saved scenario…'}</option>
             {saved.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -268,12 +396,55 @@ export function AnalyticsTab() {
         </div>
       </div>
 
+      <div className="card bottom-line" id="tour-summary">
+        <h3>
+          <span>Bottom line</span>
+          <label className="row budget" htmlFor="budget">
+            <span className="muted">Budget (what you can pay) $</span>
+            <input
+              id="budget"
+              type="number"
+              min={0}
+              step={50000}
+              placeholder="none"
+              value={scenario.settings.budget ?? ''}
+              onChange={(e) => setSettings({ budget: e.target.value === '' || +e.target.value <= 0 ? undefined : +e.target.value })}
+            />
+          </label>
+        </h3>
+        <ul>
+          {lines.map((l) => (
+            <li key={l.k}>
+              <span className={`tag ${l.tone ?? ''}`}>{l.k}</span>
+              <span>{l.body}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="row wrap jump">
+          <span className="muted">Jump to:</span>
+          <button className="btn small" onClick={() => jump('tour-hourly')}>
+            Load through the day
+          </button>
+          <button className="btn small" onClick={() => jump('tour-sitetable')}>
+            Site by site
+          </button>
+          <button className="btn small" onClick={() => jump('tour-cost')}>
+            Cost
+          </button>
+          {area && (
+            <button className="btn small" onClick={() => jump('tour-networktable')}>
+              Grid zones
+            </button>
+          )}
+        </div>
+      </div>
+
       <div className="kpis" id="tour-kpis">
         <Kpi label="Sites / plugs" value={`${scenario.sites.length} / ${sum.ports}`} b={sumB ? `${compare!.sites.length} / ${sumB.ports}` : undefined} />
         <Kpi label="Sticker rating" value={fmt.kw(sum.nameplate)} help="All plugs' maximum power added up (nameplate). Almost never drawn in practice." b={sumB ? fmt.kw(sumB.nameplate) : undefined} />
         <Kpi label="Load at grid rush hour" value={fmt.kw(sum.coincident)} sub={`at ${peakHour}:00 · sites' own busiest moment ${fmt.kw(sum.peak)}`} help="What all sites together draw at the grid's rush hour, after allowing for who is plugged in, charging taper, smart charging and batteries. This is the number that matters to Con Edison." b={sumB ? fmt.kw(sumB.coincident) : undefined} />
         <Kpi label="Energy per year" value={`${fmt.int(sum.annualMwh)} MWh`} b={sumB ? `${fmt.int(sumB.annualMwh)} MWh` : undefined} />
-        <Kpi label="Equipment red / amber" value={`${sum.crit} / ${sum.warn}`} help="How many pieces of nearby grid equipment (transformers, street mains, vaults, map sheets, grid zones) your sites push over the amber or red line." b={sumB ? `${sumB.crit} / ${sumB.warn}` : undefined} />
+        <Kpi label="Equipment in the red / amber" value={`${sum.crit} / ${sum.warn}`} help="How many pieces of nearby grid equipment (transformers, street mains, vaults, map sheets, grid zones) your sites push over the amber or red line." b={sumB ? `${sumB.crit} / ${sumB.warn}` : undefined} />
         <Kpi label="Estimated cost" value={fmt.usd(sum.cost)} sub={`grants ${fmt.usd(sum.incentive)} · you pay ${fmt.usd(sum.cost - sum.incentive)}`} b={sumB ? fmt.usd(sumB.cost) : undefined} />
         <Kpi label="Sites in DACs" value={`${sum.dacSites} / ${scenario.sites.length}`} help="New York's climate law aims for at least 35 % of clean-energy benefits to reach disadvantaged communities." b={sumB ? `${sumB.dacSites} / ${compare!.sites.length}` : undefined} />
         {area && <Kpi label={`EVs on the road (${area.year})`} value={fmt.int(area.totalEvs)} sub={`${fmt.pct(area.evShare, 1)} of ${fmt.int(area.totalVehicles)} cars`} b={compareArea ? `${fmt.int(compareArea.totalEvs)} (${compareArea.year})` : undefined} />}
@@ -331,7 +502,8 @@ export function AnalyticsTab() {
             <tbody>
               {scenario.sites.map((s) => {
                 const a = assessments.get(s.id);
-                const binding = a?.assets.filter((x) => x.ratio != null).sort((x, y) => (y.ratio ?? 0) - (x.ratio ?? 0))[0];
+                const v = verdictFor(a);
+                const binding = v.tightest;
                 return (
                   <tr key={s.id}>
                     <td>{s.name}</td>
@@ -342,12 +514,12 @@ export function AnalyticsTab() {
                     <td className="num">{a ? fmt.pct(a.coincidentKw / Math.max(1, a.nameplateKw)) : '—'}</td>
                     <td className="num">{fmt.int(a?.annualMwh)}</td>
                     <td>
-                      <StatusPill status={a?.worst ?? 'unknown'} />
+                      <StatusPill status={v.status} label={VERDICT_WORD[v.level]} />
                     </td>
                     <td>
                       {binding ? (
                         <span className="row" style={{ gap: 6 }}>
-                          <StatusDot status={binding.status} /> {binding.name} ({fmt.pct(binding.ratio)})
+                          <StatusDot status={binding.status} /> {binding.name} ({fmt.fill(binding.ratio)})
                         </span>
                       ) : (
                         '—'
@@ -464,7 +636,7 @@ export function AnalyticsTab() {
                       <td>{n.capacityRange ?? '—'}</td>
                       <td className="num">{n.plateHeadroomMw != null ? n.plateHeadroomMw.toFixed(1) : '—'}</td>
                       <td className="num">{n.remainingMw != null ? n.remainingMw.toFixed(1) : '—'}</td>
-                      <td className="num">{fmt.pct(n.ratio)}</td>
+                      <td className="num">{fmt.fill(n.ratio)}</td>
                       <td>
                         <StatusPill status={n.status as Status} />
                       </td>
