@@ -350,7 +350,9 @@ export function HelpTab() {
           <dd>The equipment is nearby but Con Edison has not published a number for it, or your site's load was not assigned to it.</dd>
         </dl>
         <p>
-          A site's overall colour is its worst light. The map outlines every piece of equipment it checked in that colour; click one to see Con Edison's raw figures. Until the equipment
+          A site's overall colour is its worst light. The map outlines every piece of equipment it checked in that colour; click one to see Con Edison's raw figures. Around a selected site, the
+          <b> dashed circle</b> is how far it looks for equipment, the <b>dotted outline</b> is the Con Edison map sheet it sits on, and each <b>ring</b> is a piece of equipment it
+          draws from. Until the equipment
           around a site has loaded, the site shows <i>Checking…</i> rather than a colour.
         </p>
         <p>
