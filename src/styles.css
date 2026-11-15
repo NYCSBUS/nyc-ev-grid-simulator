@@ -698,6 +698,24 @@ h4 {
   width: 10px;
   height: 10px;
 }
+/* line-style samples: neutral grey, because on the map each takes its traffic-light colour */
+.legend .sw.dash,
+.legend .sw.dots {
+  height: 0;
+  width: 18px;
+  border-radius: 0;
+  border-top: 2px dashed #cbd5e1;
+}
+.legend .sw.dots {
+  border-top: 3px dotted #cbd5e1;
+}
+.legend .sw.ring {
+  width: 12px;
+  height: 12px;
+  margin: 0 3px;
+  border-radius: 50%;
+  border: 2px solid #cbd5e1;
+}
 .legend .ramp {
   height: 10px;
   border-radius: 3px;

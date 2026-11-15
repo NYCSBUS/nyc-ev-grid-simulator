@@ -4,7 +4,7 @@ import { Check, Help } from './ui';
 import type { LayerVisibility } from '../types';
 
 const LAYER_DEFS: Array<{ key: keyof LayerVisibility; label: string; help: string; minZoom?: number; source: string }> = [
-  { key: 'sites', label: 'My charging sites', help: 'Your sites, their search circle, and the grid equipment they draw from, coloured by traffic light.', source: 'Simulator' },
+  { key: 'sites', label: 'My charging sites', help: 'Your sites, their search area (dashed circle), the map sheet they sit on (dotted outline) and the grid equipment they draw from (rings), each coloured by its traffic light.', source: 'Simulator' },
   { key: 'transformers', label: 'Transformers (the "taps")', help: 'Con Edison\'s transformers, shaded by how much room they have left: pale blue = lots, dull violet = nearly full. A white ring marks the 460 V type that fast chargers need. (Green / amber / red is kept for the traffic lights — what your site does to them.)', minZoom: MIN_ZOOM.transformers, source: 'CECONY_EVM_Prod / _Winter_Prod' },
   { key: 'feeders', label: 'Street mains (feeders)', help: 'The cables under the street that supply the transformers, shaded the same way (pale blue = lots of room for EVs, violet = little). Only published outside the dense "web" areas.', minZoom: MIN_ZOOM.feeders, source: 'CECONY_EVM_Feeders_Prod' },
   { key: 'feeders33kv', label: 'High-voltage trunk lines (33 kV)', help: 'The bigger lines that feed the substations. For orientation only.', minZoom: MIN_ZOOM.feeders33kv, source: 'CECONY_33Kv_Prod' },

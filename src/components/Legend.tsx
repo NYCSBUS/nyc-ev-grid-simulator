@@ -40,6 +40,21 @@ export function Legend({ thresholds, areaActive, layers: raw, zoom }: { threshol
           <div className="item">
             <span className="sw dot" style={{ background: '#ef4444' }} /> Doesn’t fit — {Math.round(thresholds.crit * 100)}% or more
           </div>
+          {!areaActive && (
+            <>
+              <h4 style={{ marginTop: 8 }}>Shapes around a site</h4>
+              <div className="item">
+                <span className="sw dash" /> Dashed circle — how far the site looks for equipment
+              </div>
+              <div className="item">
+                <span className="sw dots" /> Dotted outline — the Con Edison map sheet the site sits on
+              </div>
+              <div className="item">
+                <span className="sw ring" /> Ring with a % — equipment the site draws from, and how much of its room it uses
+              </div>
+              <div className="muted">Each takes the colour of its own traffic light.</div>
+            </>
+          )}
         </>
       )}
       {(layers.transformers || layers.feeders || layers.msplates) && (

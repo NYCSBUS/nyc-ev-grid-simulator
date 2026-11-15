@@ -370,12 +370,23 @@ export function MapView() {
         filter: ['==', ['get', 'kind'], 'flow'],
         paint: { 'line-color': ['get', 'color'], 'line-width': 2, 'line-dasharray': [1.5, 1.5], 'line-opacity': 0.9 },
       });
+      // Outline of the map sheet a site sits on. Dotted and named along its edge, so it cannot be mistaken for the dashed search circle.
       map.addLayer({
         id: 'impact-fill',
         type: 'line',
         source: 'impact',
         filter: ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']],
-        paint: { 'line-color': ['get', 'color'], 'line-width': 2.5, 'line-dasharray': [2, 1] },
+        layout: { 'line-cap': 'round' },
+        paint: { 'line-color': ['get', 'color'], 'line-width': 3, 'line-dasharray': [0.01, 2] },
+      });
+      map.addLayer({
+        id: 'impact-area-label',
+        type: 'symbol',
+        source: 'impact',
+        minzoom: 13,
+        filter: ['all', ['any', ['==', ['geometry-type'], 'Polygon'], ['==', ['geometry-type'], 'MultiPolygon']], ['has', 'name']],
+        layout: { 'symbol-placement': 'line', 'symbol-spacing': 320, 'text-field': ['get', 'name'], 'text-size': 11, 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'], 'text-keep-upright': true },
+        paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#0f1419', 'text-halo-width': 2.5 },
       });
       map.addLayer({
         id: 'impact-point',
@@ -413,6 +424,15 @@ export function MapView() {
         type: 'line',
         source: 'site-radius',
         paint: { 'line-color': ['get', 'color'], 'line-width': ['case', ['get', 'selected'], 2, 1], 'line-dasharray': [3, 2] },
+      });
+      // says what the dashed circle is, written along the circle itself
+      map.addLayer({
+        id: 'site-radius-label',
+        type: 'symbol',
+        source: 'site-radius',
+        minzoom: 13,
+        layout: { 'symbol-placement': 'line', 'symbol-spacing': 420, 'text-field': ['get', 'label'], 'text-size': 11, 'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'], 'text-keep-upright': true },
+        paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#0f1419', 'text-halo-width': 2.5 },
       });
       map.addLayer({
         id: 'sites-circle',
@@ -711,7 +731,7 @@ export function MapView() {
         const moving = drag?.id === s.id;
         const c = turf.circle(moving ? [drag!.lng, drag!.lat] : [s.lng, s.lat], s.radiusM / 1000, { steps: 48, units: 'kilometers' });
         const a = assessments.get(s.id);
-        return { ...c, properties: { color: STATUS_COLOR[moving ? 'unknown' : a?.worst ?? 'unknown'], selected: s.id === selectedSiteId } } as FC['features'][number];
+        return { ...c, properties: { color: STATUS_COLOR[moving ? 'unknown' : a?.worst ?? 'unknown'], selected: s.id === selectedSiteId, label: `Search area · ${fmt.m(s.radiusM)}` } } as FC['features'][number];
       }),
     }),
     [sites, assessments, selectedSiteId, drag],
@@ -726,7 +746,9 @@ export function MapView() {
       for (const asset of a.assets) {
         if (asset.status === 'unknown' || asset.kind === 'network') continue;
         const pct = asset.ratio != null ? fmt.fill(asset.ratio) : undefined;
-        feats.push({ type: 'Feature', geometry: asset.geometry, properties: { color: STATUS_COLOR[asset.status], kind: asset.kind, label: pct } });
+        // a map sheet is an area, not a dot: its name and how full it gets are written along its outline
+        const name = asset.kind === 'plate' ? `Map sheet ${asset.name.replace(/^M&S Plate\s*/, '').replace(/\s*\(.*\)$/, '')}${pct ? ` · ${pct} used` : ''}` : undefined;
+        feats.push({ type: 'Feature', geometry: asset.geometry, properties: { color: STATUS_COLOR[asset.status], kind: asset.kind, label: pct, ...(name ? { name } : {}) } });
         if (asset.geometry.type === 'Point' && asset.ratio != null)
           feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [[s.lng, s.lat], asset.geometry.coordinates] }, properties: { color: STATUS_COLOR[asset.status], kind: 'flow' } });
       }
@@ -754,7 +776,7 @@ export function MapView() {
     vis(['buildings-fill'], layers.buildings);
     vis(['feeders33kv-line'], layers.feeders33kv);
     vis(['sites-circle', 'sites-label', 'sites-icon'], layers.sites);
-    vis(['site-radius-fill', 'site-radius-line', 'impact-line', 'impact-point', 'impact-fill', 'impact-flow', 'impact-label'], layers.sites && mode === 'sites');
+    vis(['site-radius-fill', 'site-radius-line', 'site-radius-label', 'impact-line', 'impact-point', 'impact-fill', 'impact-area-label', 'impact-flow', 'impact-label'], layers.sites && mode === 'sites');
     if (map.getLayer('sites-label')) {
       map.setLayoutProperty('sites-label', 'text-field', ['get', mode === 'outlook' ? 'short' : 'label']);
       map.setLayoutProperty('sites-label', 'text-allow-overlap', mode === 'sites');
